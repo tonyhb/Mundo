@@ -1,0 +1,27 @@
+<phpunit 
+	colors="true"
+	bootstrap="../../../public_html/index.php"
+	verbose="true"
+	stopOnError="false"
+    stopOnFailure="false"
+    stopOnIncomplete="false"
+    stopOnSkipped="false"
+	> 
+
+	<php>
+		<server name="HTTP_HOST" value="metamongo.local"/>
+	</php>
+
+	<testsuites> 
+      <testsuite name="MetaMongo Tests"> 
+		<file>./metamongo.php</file>
+	  </testsuite> 
+    </testsuites> 
+
+	<filter>
+	  <whitelist>
+	    <directory suffix=".php">../../</directory>
+	  </whitelist>
+	</filter>
+
+</phpunit>
