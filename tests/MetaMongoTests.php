@@ -18,6 +18,7 @@ class MetaMongoTests extends PHPUnit_Framework_TestCase
 	 *
 	 *
 	 * @covers MetaMongo::factory
+	 * @covers MetaMongo_Object::__construct
 	 */
 	public function test_factory_returns_instance_with_values()
 	{
@@ -40,6 +41,16 @@ class MetaMongoTests extends PHPUnit_Framework_TestCase
 		$this->assertSame($object->get(), $values);
 	}
 
+	/**
+	 * Ensures that an error is thrown when the second factory parameter is not
+	 * an array.
+	 *
+	 * @expectedException MetaMongo_Exception
+	 */
+	public function test_factory_throws_error_when_assigning_non_array()
+	{
+		$object = MetaMongo::factory('blogpost', 'error');
+	}
 
 	/**
 	 * Provides test data for test_set_and_get
@@ -224,6 +235,83 @@ class MetaMongoTests extends PHPUnit_Framework_TestCase
 			{
 				// Ensure the data is the same as we put in.
 				$this->assertSame($metamongo->get(), $data);
+			}
+		}
+	}
+
+	/**
+	 * Provider for test_single_set_and_get
+	 *
+	 * @return array
+	 */
+	public static function provider_single_set_and_get()
+	{
+		return array(
+			// Set a value in a root-level field
+			array(
+				'post_title',
+				'Post title goes here',
+				NULL
+			),
+			// Use dot-notation to set an array value
+			array(
+				'post_metadata.keywords',
+				'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+				NULL,
+				array(
+					'post_metadata' => array(
+						'keywords' => 'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+					)
+				)
+			)
+		);
+	}
+
+	/**
+	 * Test setting and getting single fields at once works as expected
+	 *
+	 * @test
+	 * @covers MetaMongo_Object::get
+	 * @covers MetaMongo_Object::set
+	 * @dataProvider provider_single_set_and_get
+	 * @param  string  $field            Name of field we are setting
+	 * @param  string  $value            Value of the field
+	 * @param  string  $expected_error   Expected error message, if any
+	 * @param  string  $expected_result  Expected result, if different from array($field => $value)
+	 */
+	public function test_single_set_and_get($field, $value, $expected_error, $expected_result = NULL)
+	{
+		$metamongo = new Model_Blogpost;
+
+		if ($expected_error)
+		{
+			try
+			{
+				// Setting our data should fail
+				$metamongo->set($field, $value);
+			}
+			catch (Exception $e)
+			{
+				// Ensure our error message is correct and it failed for the right reasons.
+				$this->assertEquals($e->getMessage(), $expected_error);
+			}
+		}
+		else
+		{
+			// Set our data
+			$metamongo->set($field, $value);
+
+			if ($expected_result)
+			{
+				// Ensure the data is the same as the expected result
+				$this->assertSame($metamongo->get($field), $value);
+				$this->assertSame($metamongo->get(), $expected_result);
+			}
+			else
+			{
+				// Ensure the data is the same as we put in.
+				$this->assertSame($metamongo->get($field), $value);
+				$this->assertSame($metamongo->get(), array($field => $value));
 			}
 		}
 	}

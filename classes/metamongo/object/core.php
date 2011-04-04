@@ -168,6 +168,8 @@ class MetaMongo_Object_Core
 			// Reset our array path
 			$this->__array_path = $parent_path;
 		}
+
+		return $this;
 	}
 
 	/**
@@ -181,10 +183,19 @@ class MetaMongo_Object_Core
 	{
 		if ( ! $path)
 		{
-			return Arr::merge($this->_data, $this->_changed); 
+			return $this->_merge(); 
 		}
 
-		return Arr::path($this->_data, $path);
+		return Arr::path($this->_merge(), $path);
 	}
 
+	/**
+	 * Convenience function for merging saved and changed data
+	 *
+	 * @return array
+	 */
+	protected function _merge()
+	{
+		return Arr::merge($this->_data, $this->_changed);
+	}
 } // End MetaMongo_Object_Core
