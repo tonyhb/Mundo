@@ -75,13 +75,6 @@ class MetaMongo_Object_Core
 	protected $_changed = array();
 
 	/**
-	 * This is an internal variable used
-	 *
-	 * @var string
-	 */
-	private $__array_path;
-
-	/**
 	 * Assigns field data by name. Assigned variables will first be added to
 	 * the $_changed variable until the collection has been updated.
 	 *
@@ -93,9 +86,6 @@ class MetaMongo_Object_Core
 	 */
 	public function set($values, $value = NULL)
 	{
-		// Save this so looping through our fields doesn't overwrite the path permanently.
-		$parent_path = $this->__array_path;
-
 		if ($value)
 		{
 			// Normalise single field setting to multiple field setting
@@ -105,9 +95,25 @@ class MetaMongo_Object_Core
 		if ( ! $values)
 			return $this;
 
+		// Call our set function
+		$this->_set($values);
+
+		return $this;
+	}
+
+	/**
+	 * The logic behind the set() & __set() methods, set as protected to avoid 
+	 * accidentally setting the $parent_path parameter and to reduce confusion.
+	 *
+	 *
+	 * @param   array  $values        Values to set 
+	 * @param   string $parent_path   The path to our current field
+	 * @return  void
+	 */
+	protected function _set($values, $parent_path = NULL)
+	{
 		foreach ($values as $field => $value)
 		{
-
 			if (strpos($field, '.') !== FALSE)
 			{
 				// We're using dot notation to set an embedded object, so separate our path string.
@@ -120,17 +126,16 @@ class MetaMongo_Object_Core
 				$parent_path = $this->__array_path = implode('.', $paths);
 			}
 
-			// If the array path exists
-			$this->__array_path = ($this->__array_path) ? $this->__array_path.'.'.$field : $field;
+			// Set our working path as either the field name or the path to our field.
+			$path = ($parent_path) ? $parent_path.'.'.$field : $field;
 
 			if (is_array($value))
 			{
 				// Call set on the embedded object
-				$this->set($value);
+				$this->_set($value, $path);
 			}
 			else
 			{
-
 				if ($parent_path)
 				{
 					// Exchange numerical paths for the '$' indicator.
@@ -163,14 +168,9 @@ class MetaMongo_Object_Core
 				}
 
 				// Set our data
-				Arr::set_path($this->_changed, $this->__array_path, $value);
+				Arr::set_path($this->_changed, $path, $value);
 			}
-
-			// Reset our array path
-			$this->__array_path = $parent_path;
 		}
-
-		return $this;
 	}
 
 	/**
@@ -199,4 +199,5 @@ class MetaMongo_Object_Core
 	{
 		return Arr::merge($this->_data, $this->_changed);
 	}
+
 } // End MetaMongo_Object_Core

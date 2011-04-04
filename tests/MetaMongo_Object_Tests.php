@@ -22,7 +22,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 			array(
 				array(
 					'post_title'    => 'Example blog post',
-					'post_slug'     => 'example-blog-post.html',
+					'post_slug'     => 'example-blog-post',
 					'post_date'     => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
 					'author'        => new MongoId('4d965966ef966f0916000000'),
 					'author_name'   => 'Author Jones',
@@ -116,7 +116,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 			array(
 				array(
 					'post_title' => 'Example blog post',
-					'post_slug'  => 'example-blog-post.html',
+					'post_slug'  => 'example-blog-post',
 					'post_date'  => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
 					'author'     => new MongoId('4d965966ef966f0916000000'),
 					'undefined'  => 'Undefined field which should cause setting to fail.',
@@ -128,7 +128,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 			array(
 				array(
 					'post_title' => 'Example blog post',
-					'post_slug'  => 'example-blog-post.html',
+					'post_slug'  => 'example-blog-post',
 					'post_date'  => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
 					'author'     => new MongoId('4d965966ef966f0916000000'),
 					'comments'      => array(
