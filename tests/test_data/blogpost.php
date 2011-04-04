@@ -39,23 +39,23 @@ class Model_Blogpost extends MetaMongo_Object
 		'author_email', 
 		'post_excerpt',
 		'post_content',
+		'post_metadata' => array(
+			// The single array denotes a single embedded object.
+			'keywords',
+			'description',
+		),
 		'comments' => array(
 			// The following '$' character as an array key tells MetaMongo we can have many of the following objects.
 			'$' => array(
 				'comment',
-				'comment_author',
-				'comment_url',
-				'comment_email',
+				'author_name',
+				'author_url',
+				'author_email',
 				'likes' => array(
 					'$', // A single '$' character as a value (NOT a key) tells MetaMongo that we can have a flat array of any length (in this case the name of people that 'liked' the comment.)
 				),
 			),
 		),
-		'post_metadata' => array(
-			// The single array denotes a single embedded object.
-			'keywords',
-			'descroption',
-		)
 	);
 
 
