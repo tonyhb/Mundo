@@ -1,5 +1,7 @@
 <?php
 
+include __DIR__.'/test_data/blogpost.php';
+
 /**
  * Tests the MetaMongo class
  *
@@ -9,28 +11,6 @@
  */
 class MetaMongoTests extends PHPUnit_Framework_TestCase
 {
-
-	/**
-	 * Bitch-ass PHPUnit doesn't like me including my test data in construct
-	 * without this.
-	 *
-	 * @var boolean
-	 */
-	static $_included = FALSE;
-
-	public function __construct()
-	{
-		parent::__construct();
-
-		if ( ! $this::$_included)
-		{
-			// Ensure we include our MetaMongo instance without Kohana's help. Note that __DIR__ is equivalent to dirname(__FILE__) and was added in PHP 5.3.0
-			include __DIR__.'/test_data/blogpost.php';
-
-			// We've already included it.
-			$this::$_included = TRUE;
-		}
-	}
 
 	/**
 	 * Ensures the factory method assigns the variables passed and returns a
@@ -64,9 +44,8 @@ class MetaMongoTests extends PHPUnit_Framework_TestCase
 	/**
 	 * Provides test data for test_set_and_get
 	 *
-	 * @return array
 	 */
-	public function provider_set_and_get()
+	public static function set_and_get()
 	{
 		// $data, $expected_error (null if it should succeed)
 		return array(
@@ -103,6 +82,67 @@ class MetaMongoTests extends PHPUnit_Framework_TestCase
 				// This should work correctly
 				NULL,
 			),
+			// Only the "likes" array of one comment.
+			array(
+				array(
+					
+					'comments' => array(
+						array(
+							'likes' => array('Joe Bloggs', 'Ted Smith'),
+						),
+					),
+				),
+				// This should work correctly
+				NULL,
+			),
+			// Two fields being set using dot path notation
+			array(
+				array(
+					'post_metadata.keywords' => 'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+					'post_metadata.description' => 'An example description tag for a blog post. Google SERP me plox!',
+				),
+				// This should work correctly
+				NULL,
+				array(
+					'post_metadata' => array(
+						'keywords'    => 'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+						'description' => 'An example description tag for a blog post. Google SERP me plox!',
+					),
+				)
+			),
+			// Dot notation on an embedded object
+			array(
+				array(
+					'comments.0.comment'      => 'Comment number 1',
+					'comments.0.author_name'  => 'Commenter Smith',
+					'comments.0.author_url'   => 'http://example-commenter.com/',
+					'comments.0.author_email' => 'commenter.smith@example.com',
+					'comments.0.likes'        => array('Joe Bloggs', 'Ted Smith'),
+					'comments.1.comment'      => 'Comment number 2',
+					'comments.1.author_name'  => 'Commenter Brown',
+					'comments.1.author_email' => 'commenter.brown@example.com',
+					'comments.1.likes.0'      => 'First like',
+					'comments.1.likes.1'      => 'Second like',
+				),
+				NULL,
+				array(
+					'comments' => array(
+						array(
+							'comment'      => 'Comment number 1',
+							'author_name'  => 'Commenter Smith',
+							'author_url'   => 'http://example-commenter.com/',
+							'author_email' => 'commenter.smith@example.com',
+							'likes'        => array('Joe Bloggs', 'Ted Smith'),
+						),
+						array(
+							'comment'      => 'Comment number 2',
+							'author_name'  => 'Commenter Brown',
+							'author_email' => 'commenter.brown@example.com',
+							'likes'        => array('First like', 'Second like'),
+						),
+					),
+				)
+			),
 			// Data with an undefined field which should fail.
 			array(
 				array(
@@ -134,27 +174,28 @@ class MetaMongoTests extends PHPUnit_Framework_TestCase
 					),
 				),
 				// MetaMongo should throw an error saying our field doesn't exist
-				"Field 'embedded' does not exist", 
+				"Field 'comments.0.embedded' does not exist", 
 			),
 		);
 	}
-
 
 	/**
 	 * Tests that the set and get functions work as expected
 	 *
 	 *
 	 * @test
-	 * @covers MetaMongo::set
-	 * @covers MetaMongo::get
-	 * @dataProvider provider_set_and_get
-	 * @param array   $data   The array of data to set
-	 * @param mixed   $expected_error   Null if setting should pass, otherwise the error exception message.
+	 * @covers MetaMongo_Object::set
+	 * @covers MetaMongo_Object::get
+	 * @dataProvider set_and_get
+	 * @param  array  $data             The array of data to set
+	 * @param  mixed  $expected_error   Null if setting should pass, otherwise the error exception message.
+	 * @param  array  $expected_result  The expected result of get() if it isn't the same as $data.
 	 *
 	 */
-	public function test_set_and_get($data, $expected_error)
+	public function test_set_and_get($data, $expected_error, $expected_result = NULL)
 	{
-		$metamongo = new MetaMongo_Object;
+
+		$metamongo = new Model_Blogpost;
 
 		if ($expected_error)
 		{
@@ -174,8 +215,16 @@ class MetaMongoTests extends PHPUnit_Framework_TestCase
 			// Set our data
 			$metamongo->set($data);
 
-			// Ensure it sets fine.
-			$this->assertSame($metamongo->get(), $data);
+			if ($expected_result)
+			{
+				// Ensure the data is the same as the expected result
+				$this->assertSame($metamongo->get(), $expected_result);
+			}
+			else
+			{
+				// Ensure the data is the same as we put in.
+				$this->assertSame($metamongo->get(), $data);
+			}
 		}
 	}
 
