@@ -220,9 +220,94 @@ class MetaMongo_Object_Core
 			$data = $this->_merge();
 		}
 
-		$data = MetaMongo::flatten($data);
+		$flat_data = MetaMongo::flatten($data);
 
-		return Validation::factory($data);
+		$validation = Validation::factory($flat_data);
+
+		if ($this->_rules)
+		{
+			// Get our rules
+			$rules = $this->_extract_rules($data);
+
+			foreach ($rules as $field => $rule)
+			{
+				// Assign the rules for each field
+				$validation->rules($field, $rule);
+			}
+		}
+
+		return $validation;
+	}
+
+	/**
+	 * This extracts rules form $_rules in the format required for the
+	 * Validation library
+	 *
+	 * @param string $rules 
+	 * @return void
+	 * @author Tony Holdstock-Brown
+	 */
+	protected function _extract_rules($data, $rules = NULL, $path = NULL)
+	{
+
+		if ( ! $rules)
+		{
+			// We have to manually set them with recusivity
+			$rules = $this->_rules;
+		}
+
+		foreach ($rules as $field => $rule)
+		{
+			
+			if ($field == '$')
+			{
+				// If this is an embedded collection, we need to work out how many collections we're accounting for.
+				// This is to assign validation rules to each collection member we have.
+				$collection_number = count(Arr::path($data, $path)) - 1;
+
+				if ($collection_number < 0)
+				{
+					// We have no embedded objects, so don't validate
+					continue;
+				}
+			}
+			else
+			{
+				// Add dots to our path (not necessary on the first traversal)
+				$dotted_path = $path ? $path.'.'.$field : $field;
+
+				// Hack to loop assignments once without collecitons
+				$collection_number = 1;
+			}
+
+			do
+			{
+				if ($field == '$')
+				{
+					// Add our collection number to our path (if we need to).
+					$dotted_path = $path ? $path.'.'.$collection_number : $collection_number;
+				}
+
+				if (Arr::is_assoc($rule))
+				{
+					// If $rule is an associative array this is an embedded object/coll. Run this again.
+					if ($embedded_rules = $this->_extract_rules($data, $rule, $dotted_path))
+					{
+						// Make sure we return it
+						$ruleset = isset($ruleset) ? Arr::merge($ruleset, $embedded_rules) : $embedded_rules;
+					}
+				}
+				else
+				{
+					// Assign our rule
+					$ruleset[$dotted_path] = $rule;
+				}
+			}
+			while($collection_number--);
+		}
+
+		// Return our rules
+		return isset($ruleset) ? $ruleset : FALSE;
 	}
 
 } // End MetaMongo_Object_Core
