@@ -200,4 +200,29 @@ class MetaMongo_Object_Core
 		return Arr::merge($this->_data, $this->_changed);
 	}
 
+	/**
+	 * Loads a Validation object with the rules defined in the model and 
+	 * either the set model data or the data passed as an arguemnt.
+	 *
+	 * Note: This function returns a Validation object and does not validate
+	 * data itself. Just run check() on this function's return value. I did
+	 * this because it makes it easier to grab error messages and use the 
+	 * normal Validation library.
+	 *
+	 * @param   string $data 
+	 * @return  Validation
+	 */
+	public function validate($data = NULL)
+	{
+		if ( ! $data)
+		{
+			// Use already set data if none is given
+			$data = $this->_merge();
+		}
+
+		$data = MetaMongo::flatten($data);
+
+		return Validation::factory($data);
+	}
+
 } // End MetaMongo_Object_Core
