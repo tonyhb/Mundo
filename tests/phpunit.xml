@@ -15,6 +15,7 @@
 	<testsuites> 
       <testsuite name="MetaMongo Tests"> 
 		<file>./MetaMongoTests.php</file>
+		<file>./MetaMongo_Object_Tests.php</file>
 	  </testsuite> 
     </testsuites> 
 

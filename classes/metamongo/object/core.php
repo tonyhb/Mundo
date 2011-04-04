@@ -5,6 +5,7 @@
  * database updates and database searching.
  *
  * @package MetaMongo
+ * @subpackage MetaMongo_Object
  * @author Tony Holdstock-Brown
  **/
 class MetaMongo_Object_Core
