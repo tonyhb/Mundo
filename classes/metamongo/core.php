@@ -10,6 +10,9 @@
 class MetaMongo_Core
 {
 
+	const ASC = 1;
+	const DESC = -1;
+
 	/**
 	 * Return a MetaMongo_Object class with some initial $data.
 	 *
