@@ -32,7 +32,7 @@ class MetaMongo_Object_Core
 	 * Validation rules to run against data. The validation rules are ran when
 	 * we save/update the collection or when we call the validate() method.
 	 *
-	 * @var arra
+	 * @var array
 	 */
 	protected $_rules;
 
