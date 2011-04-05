@@ -385,7 +385,7 @@ class MetaMongo_Object_Core
 	{
 		if ($this->get('_id'))
 		{
-			// When we run load the function alters $_loaded, so we need to duplicate our class
+			// Running the load() method alters $_loaded, so we need to duplicate our class
 
 			// Get the model class name (PHP => 5.3.X )
 			$class = get_called_class();
@@ -399,7 +399,7 @@ class MetaMongo_Object_Core
 			// See if an object with this ID exists
 			if($object->load($this->get('_id'))->loaded())
 			{
-				// We cannot create an object with a duplicate ID (all IDs in mungo are auto-generated for now)
+				// We cannot create a document with a duplicate ID
 				Throw new MetaMongo_Exception("Creating failed: a document with ObjectId ':object_id' exists already.", array(":object_id" => $this->get('_id')));
 			}
 
