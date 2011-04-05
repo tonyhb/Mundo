@@ -44,6 +44,22 @@ class MetaMongo_Object_Core
 	protected $_filters;
 
 	/**
+	 * Our Mongo class
+	 *
+	 * @var  Mongo
+	 * @see  http://www.php.net/manual/en/class.mongo.php
+	 */
+	protected $_mongo;
+
+	/**
+	 * Our MongoDB class
+	 *
+	 * @var  MongoDB
+	 * @see  http://www.php.net/manual/en/class.mongodb.php
+	 */
+	protected $_db;
+
+	/**
 	 * Initialise our data
 	 *
 	 * @param array $data 
@@ -178,7 +194,7 @@ class MetaMongo_Object_Core
 	 * ($_data) and the changed data ($_changed) before returning.
 	 *
 	 * @param  string  Path of the field to return (eg. comments.0.author)
-	 * @return mixed
+	 * @return mixed   Array of data if no path was supplied, or the value of the field/null if no field was found
 	 **/
 	public function get($path = NULL)
 	{
@@ -188,6 +204,38 @@ class MetaMongo_Object_Core
 		}
 
 		return Arr::path($this->_merge(), $path);
+	}
+
+	/**
+	 * Gets changed data for a given field. If no field is supplied, this
+	 * returns all changed data.
+	 *
+	 * @return mixed
+	 */
+	public function changed($path = NULL)
+	{
+		if ( ! $path)
+		{
+			return $this->_changed; 
+		}
+
+		return Arr::path($this->_changed, $path);
+	}
+
+	/**
+	 * Gets original (saved) data for a given field. If no field is supplied, 
+	 * this returns all original data.
+	 *
+	 * @return mixed
+	 */
+	public function original($path = NULL)
+	{
+		if ( ! $path)
+		{
+			return $this->_data; 
+		}
+
+		return Arr::path($this->_data, $path);
 	}
 
 	/**
@@ -245,7 +293,6 @@ class MetaMongo_Object_Core
 	 *
 	 * @param string $rules 
 	 * @return void
-	 * @author Tony Holdstock-Brown
 	 */
 	protected function _extract_rules($data, $rules = NULL, $path = NULL)
 	{
@@ -308,6 +355,98 @@ class MetaMongo_Object_Core
 
 		// Return our rules
 		return isset($ruleset) ? $ruleset : FALSE;
+	}
+
+	/**
+	 * Whether we have a document loaded from the database
+	 *
+	 * @var boolean
+	 */
+	protected $_loaded = FALSE;
+
+	/**
+	 * Returns the $_loaded value which indicates whether a document has been
+	 * loaded from the database
+	 *
+	 * @return boolean
+	 */
+	public function loaded()
+	{
+		return $this->_loaded;
+	}
+
+	/**
+	 * Creates a new document in our collection
+	 *
+	 * @return  mixed  $this
+	 * @throws  mixed  Validation_Exception, MetaMongo_Exception
+	 */
+	public function create()
+	{
+		if ($this->get('_id'))
+		{
+			// We cannot create an object with a duplicate ID (all IDs in mungo are auto-generated for now)
+			Throw new MetaMongo_Exception('To create a new object please remove its ObjectID (_id) field');
+		}
+
+		$validate = $this->validate();
+
+		if ( ! $validate->check())
+		{
+			throw new Validation_Exception($validate);
+		}
+
+		// Intiialise our database
+		$this->_init_db();
+
+		// Merge our existing data and changed data
+		$data = $this->_merge();
+
+		// Insert our data
+		$this->_collection->insert($data, array('safe' => $this->_safe));
+
+		// Reset our $_changed to empty after our save
+		$this->_changed = array();
+
+		// Update our saved data variable
+		$this->_data = $data;
+
+		// We're now loaded
+		$this->_loaded = TRUE;
+
+		return $this;
+	}
+
+	/**
+	 * Connect to Mongo for queries
+	 *
+	 * @return self 
+	 */
+	protected function _init_db()
+	{
+
+		if ($this->_mongo instanceof Mongo AND $this->_db instanceof MongoDB AND $this->_collection instanceof MongoCollection)
+		{
+			// Our database is already initialised
+			return $this;
+		}
+
+		// Get our configuration information
+		$config = Kohana::config('metamongo');
+
+		// Load and connect to mongo
+		$this->_mongo = new Mongo();
+
+		// Select our database
+		$this->_db = $this->_mongo->{$config->database};
+
+		// Set our safety settings
+		$this->_safe = $config->mongo_safe;
+
+		// Load our selected collection using the same variable as our collection name.
+		$this->_collection = $this->_db->{$this->_collection};
+
+		return $this;
 	}
 
 } // End MetaMongo_Object_Core

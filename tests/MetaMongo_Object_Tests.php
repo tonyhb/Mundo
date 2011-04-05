@@ -156,6 +156,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @covers MetaMongo_Object::set
 	 * @covers MetaMongo_Object::_set
 	 * @covers MetaMongo_Object::get
+	 * @covers MetaMongo_Object::changed
 	 * @dataProvider set_and_get
 	 * @param  array  $data             The array of data to set
 	 * @param  mixed  $expected_error   Null if setting should pass, otherwise the error exception message.
@@ -189,11 +190,13 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 			{
 				// Ensure the data is the same as the expected result
 				$this->assertSame($metamongo->get(), $expected_result);
+				$this->assertSame($metamongo->changed(), $expected_result);
 			}
 			else
 			{
 				// Ensure the data is the same as we put in.
 				$this->assertSame($metamongo->get(), $data);
+				$this->assertSame($metamongo->changed(), $data);
 			}
 		}
 	}
@@ -233,6 +236,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @covers MetaMongo_Object::get
 	 * @covers MetaMongo_Object::set
 	 * @covers MetaMongo_Object::_set
+	 * @covers MetaMongo_Object::changed
 	 * @dataProvider provider_single_set_and_get
 	 * @param  string  $field            Name of field we are setting
 	 * @param  string  $value            Value of the field
@@ -266,22 +270,25 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 				// Ensure the data is the same as the expected result
 				$this->assertSame($metamongo->get($field), $value);
 				$this->assertSame($metamongo->get(), $expected_result);
+				$this->assertSame($metamongo->changed($field), $value);
 			}
 			else
 			{
 				// Ensure the data is the same as we put in.
 				$this->assertSame($metamongo->get($field), $value);
 				$this->assertSame($metamongo->get(), array($field => $value));
+				$this->assertSame($metamongo->changed(), array($field => $value));
 			}
 		}
 	}
 
 	/**
-	 * Provides data for test_validate_set_data and test_validate_array_data
+	 * Provides data for test_validate_set_data, test_validate_array_data
+	 * test_create_document
 	 *
 	 * @return array
 	 */
-	public static function provider_validate_data()
+	public static function provider_validate_and_create_data()
 	{
 		return array(
 			// $field_data, $check_result, $expected_errors
@@ -430,7 +437,8 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 *
 	 * @covers MetaMongo_Object::validate
 	 * @covers MetaMongo_Object::_extract_rules
-	 * @dataProvider provider_validate_data
+	 * @dataProvider provider_validate_and_create_data
+	 *
 	 * @param   array  $data             array of model data to set
 	 * @param   bool   $check_result     Whether the validation check() method should return true or false
 	 * @param   array  $expected_errors  Array of expected error messages from the errors() method
@@ -454,8 +462,10 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	/**
 	 * Validates data that is passed as an argument to the validate method
 	 *
+	 * @test
 	 * @covers MetaMongo_Object::validate
-	 * @dataProvider provider_validate_data
+	 * @dataProvider provider_validate_and_create_data
+	 *
 	 * @param   array  $data             array of model data to set
 	 * @param   bool   $check_result     Whether the validation check() method should return true or false
 	 * @param   array  $expected_errors  Array of expected error messages from the errors() method
@@ -475,4 +485,90 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 			$this->assertSame($expected_errors, $validation->errors(TRUE));
 		}
 	}
+
+	/**
+	 * Check that the create() method adds documents to our collection, adds
+	 * the ObjectId to our $_data and throws validation exceptions if data
+	 * does not pass the validation check.
+	 *
+	 * @test
+	 * @covers MetaMongo_Object::create
+	 * @covers MetaMongo_Object::loaded
+	 * @covers MetaMongo_Object::changed
+	 * @covers MetaMongo_Object::original
+	 * @covers MetaMongo_Object::_init_db
+	 * @dataProvider provider_validate_and_create_data
+	 *
+	 * @param  array   $data   Data to add to the DB
+	 * @param  string  $validation_status   Whether $data should pass validation checks
+	 * @param  string  $expected_validation_errors    Expected validation error messages
+	 * @return void
+	 */
+	public function test_create_document($data, $validation_status, $expected_validation_errors = NULL)
+	{
+		$document = new Model_Blogpost($data);
+
+		if ($validation_status)
+		{
+			// Attempt to create
+			$document->create();
+
+			// Ensure an ObjectId has been added to our data, which indicates the save
+			$this->assertInstanceOf('MongoId', $document->get('_id'));
+
+			// Ensure we are now loaded
+			$this->assertTrue($document->loaded());
+
+			// Ensure we have no changed data
+			$this->assertempty($document->changed());
+
+			// Add our ObjectId to our $data to ensure that all data has been moved into the $_data variable
+			$data['_id'] = $document->get('_id');
+			$this->assertEquals($data, $document->original());
+
+			// Ensure we can't run create() when we already have an ObjectId in our data			
+			$document = new Model_Blogpost($data);
+
+			try
+			{
+				$document->create();
+			}
+			catch(MetaMongo_Exception $e)
+			{
+				$this->assertSame($e->getMessage(), "To create a new object please remove its ObjectID (_id) field");
+
+				// Assert we're not loaded
+				$this->assertFalse($document->loaded());
+				return;
+			}
+
+			$this->fail("Data was created despite already specifying an ObjectId");
+		}
+		else
+		{
+			try
+			{
+				// Attempt to create
+				$document->create();
+			}
+			catch(Validation_Exception $e)
+			{
+				
+				// Ensure an ObjectId hasn't been added to our data
+				$this->assertSame($data, $document->get());
+
+				// Assert we're not loaded
+				$this->assertFalse($document->loaded());
+
+				// Ensure that we failed for the expected reasons
+				$this->assertSame($e->array->errors(TRUE), $expected_validation_errors);
+
+				return;
+			}
+
+			$this->fail("Data should have failed validation but an exception was not raised");
+
+		}
+	}
+
 }
