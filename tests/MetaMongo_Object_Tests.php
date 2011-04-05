@@ -154,6 +154,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 *
 	 * @test
 	 * @covers MetaMongo_Object::set
+	 * @covers MetaMongo_Object::_set
 	 * @covers MetaMongo_Object::get
 	 * @dataProvider set_and_get
 	 * @param  array  $data             The array of data to set
@@ -231,6 +232,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @test
 	 * @covers MetaMongo_Object::get
 	 * @covers MetaMongo_Object::set
+	 * @covers MetaMongo_Object::_set
 	 * @dataProvider provider_single_set_and_get
 	 * @param  string  $field            Name of field we are setting
 	 * @param  string  $value            Value of the field
@@ -274,4 +276,203 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 		}
 	}
 
+	/**
+	 * Provides data for test_validate_set_data and test_validate_array_data
+	 *
+	 * @return array
+	 */
+	public static function provider_validate_data()
+	{
+		return array(
+			// $field_data, $check_result, $expected_errors
+			array(
+				// Complete 
+				array(
+					'post_title'    => 'Example blog post',
+					'post_slug'     => 'example-blog-post',
+					'post_date'     => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => '...An excerpt from the post. Boom!',
+					'post_content'  => 'This is the whole post. And this should be an excerpt from the bost. Boom! // End of blog post 1.',
+					'post_metadata' => array(
+						'keywords'    => 'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+						'description' => 'An example description tag for a blog post. Google SERP me plox!',
+					),
+					'comments'      => array(
+						array(
+							'comment'      => 'Comment number 1',
+							'author_name'  => 'Commenter Smith',
+							'author_url'   => 'http://example-commenter.com/',
+							'author_email' => 'commenter.smith@example.com',
+							'likes'        => array('Joe Bloggs', 'Ted Smith'),
+						),
+						array(
+							'comment'      => 'Comment number 2',
+							'author_name'  => 'Commenter Brown',
+							'author_email' => 'commenter.brown@example.com',
+						),
+					),
+				),
+				TRUE,
+				NULL
+			),
+			array(
+				// Incorrect post slug (first dimension error)
+				array(
+					'post_title'    => 'Example blog post',
+					'post_slug'     => 'example-blog-post !',
+					'post_date'     => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => '...An excerpt from the post. Boom!',
+					'post_content'  => 'This is the whole post. And this should be an excerpt from the bost. Boom! // End of blog post 1.',
+					'post_metadata' => array(
+						'keywords'    => 'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+						'description' => 'An example description tag for a blog post. Google SERP me plox!',
+					),
+					'comments'      => array(
+						array(
+							'comment'      => 'Comment number 1',
+							'author_name'  => 'Commenter Smith',
+							'author_url'   => 'http://example-commenter.com/',
+							'author_email' => 'commenter.smith@example.com',
+							'likes'        => array('Joe Bloggs', 'Ted Smith'),
+						),
+						array(
+							'comment'      => 'Comment number 2',
+							'author_name'  => 'Commenter Brown',
+							'author_email' => 'commenter.brown@example.com',
+						),
+					),
+				),
+				FALSE,
+				array(
+					'post_slug' => 'post slug must contain only numbers, letters and dashes',
+				),
+			),
+			array(
+				// Invalid embedded object email
+				array(
+					'post_title'    => 'Example blog post',
+					'post_slug'     => 'example-blog-post',
+					'post_date'     => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => '...An excerpt from the post. Boom!',
+					'post_content'  => 'This is the whole post. And this should be an excerpt from the bost. Boom! // End of blog post 1.',
+					'post_metadata' => array(
+						'keywords'    => 'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+						'description' => 'An example description tag for a blog post. Google SERP me plox!',
+					),
+					'comments'      => array(
+						array(
+							'comment'      => 'Comment number 1',
+							'author_name'  => 'Commenter Smith',
+							'author_url'   => 'http://example-commenter.com/',
+							'author_email' => 'commenter.smith@example.com',
+							'likes'        => array('Joe Bloggs', 'Ted Smith'),
+						),
+						array(
+							'comment'      => 'Comment number 2',
+							'author_name'  => 'Commenter Brown',
+							'author_email' => 'incorrect.email@example',
+						),
+					),
+				),
+				FALSE,
+				array(
+					"comments.1.author_email" => "comments author email must be a email address",
+				)
+			),
+			array(
+				// Missing required field in an embedded object
+				array(
+					'post_title'    => 'Example blog post',
+					'post_slug'     => 'example-blog-post',
+					'post_date'     => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => '...An excerpt from the post. Boom!',
+					'post_content'  => 'This is the whole post. And this should be an excerpt from the bost. Boom! // End of blog post 1.',
+					'post_metadata' => array(
+						'keywords'    => 'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+						'description' => 'An example description tag for a blog post. Google SERP me plox!',
+					),
+					'comments'      => array(
+						array(
+							'comment'      => 'Comment number 1',
+							'author_url'   => 'http://example-commenter.com/',
+							'author_email' => 'commenter.smith@example.com',
+							'likes'        => array('Joe Bloggs', 'Ted Smith'),
+						),
+						array(
+							'comment'      => 'Comment number 2',
+							'author_name'  => 'Commenter Brown',
+							'author_email' => 'incorrect.email@example.com',
+						),
+					),
+				),
+				FALSE,
+				array(
+					"comments.0.author_name" => "comments author name must not be empty"
+				)
+			),
+		);
+	}
+
+	/**
+	 * Validates data that has already been set (from the _merge method)
+	 *
+	 * @covers MetaMongo_Object::validate
+	 * @covers MetaMongo_Object::_extract_rules
+	 * @dataProvider provider_validate_data
+	 * @param   array  $data             array of model data to set
+	 * @param   bool   $check_result     Whether the validation check() method should return true or false
+	 * @param   array  $expected_errors  Array of expected error messages from the errors() method
+	 * @return  void
+	 */
+	public function test_validate_set_data($data, $check_result, $expected_errors)
+	{
+		$metamongo = new Model_Blogpost($data);
+
+		// Valdiate() returns a validation instance
+		$validation = $metamongo->validate();
+
+		$this->assertSame($validation->check(), $check_result);
+
+		if ($expected_errors)
+		{
+			$this->assertSame($expected_errors, $validation->errors(TRUE));
+		}
+	}
+
+	/**
+	 * Validates data that is passed as an argument to the validate method
+	 *
+	 * @covers MetaMongo_Object::validate
+	 * @dataProvider provider_validate_data
+	 * @param   array  $data             array of model data to set
+	 * @param   bool   $check_result     Whether the validation check() method should return true or false
+	 * @param   array  $expected_errors  Array of expected error messages from the errors() method
+	 * @return  void
+	 */
+	public function test_validate_array_data($data, $check_result, $expected_errors)
+	{
+		$metamongo = new Model_Blogpost;
+
+		// Valdiate() returns a validation instance
+		$validation = $metamongo->validate($data);
+
+		$this->assertSame($validation->check(), $check_result);
+
+		if ($expected_errors)
+		{
+			$this->assertSame($expected_errors, $validation->errors(TRUE));
+		}
+	}
 }
