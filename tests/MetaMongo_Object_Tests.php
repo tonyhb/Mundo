@@ -375,6 +375,24 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 				NULL
 			),
 			array(
+				// Without required object (post_metadata)
+				array(
+					'post_title'    => 'Blog post inserted from ID',
+					'post_slug'     => 'blog-post-from-id',
+					'post_date'     => new MongoDate(strtotime("4th March  2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => 'An excerpt from a blog post added using an explicit ID',
+					'post_content'  => 'Blog post content here.',
+				),
+				FALSE,
+				array(
+					'post_metadata.keywords' => 'post metadata keywords must not be empty',
+					'post_metadata.description' => 'post metadata description must not be empty',
+				)
+			),
+			array(
 				// Incorrect post slug (first dimension error)
 				array(
 					'post_title'    => 'Example blog post',
