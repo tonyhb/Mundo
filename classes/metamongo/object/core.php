@@ -385,8 +385,26 @@ class MetaMongo_Object_Core
 	{
 		if ($this->get('_id'))
 		{
-			// We cannot create an object with a duplicate ID (all IDs in mungo are auto-generated for now)
-			Throw new MetaMongo_Exception('To create a new object please remove its ObjectID (_id) field');
+			// When we run load the function alters $_loaded, so we need to duplicate our class
+
+			// Get the model class name (PHP => 5.3.X )
+			$class = get_called_class();
+
+			// Create a duplicate class; 
+			$object = new $class;
+
+			// Assign our ID
+			$object->set('_id', $this->get('_id'));
+
+			// See if an object with this ID exists
+			if($object->load($this->get('_id'))->loaded())
+			{
+				// We cannot create an object with a duplicate ID (all IDs in mungo are auto-generated for now)
+				Throw new MetaMongo_Exception("Creating failed: a document with ObjectId ':object_id' exists already.", array(":object_id" => $this->get('_id')));
+			}
+
+			// Garbage collection
+			unset($object, $class);
 		}
 
 		$validate = $this->validate();
@@ -445,6 +463,56 @@ class MetaMongo_Object_Core
 
 		// Load our selected collection using the same variable as our collection name.
 		$this->_collection = $this->_db->{$this->_collection};
+
+		return $this;
+	}
+
+	/**
+	 * Loads a single document from the database using the object's
+	 * current data
+	 *
+	 * @param   MongoId   Object ID if you want to load from a specific ID without other model data
+	 * @return  $this
+	 */
+	public function load($object_id = NULL)
+	{
+		$query = array();
+
+		if ($object_id)
+		{
+			// Load from the given ObjectId
+			$query = array('_id' => $object_id);
+		}
+		elseif ( ! $this->changed() AND ! $this->loaded())
+		{
+			// No data to query with
+			throw new MetaMongo_Exception("No model data supplied");
+		}
+		elseif ( ! $this->changed())
+		{
+			// No changed data, so assume we are reloading our object. Use the current ObjectId.
+			$query = array('_id' => $this->get('_id'));
+		}
+		else
+		{
+			// Use all recent data as our query
+			$query = $this->get();
+		}
+
+		// Initialise our database
+		$this->_init_db();
+
+		if ($result = $this->_collection->findOne($query))
+		{
+			// Assign our returned data
+			$this->_data = $result;
+
+			// Set our loaded flag
+			$this->_loaded = TRUE;
+
+			// Reset our changed array
+			$this->_changed = array();
+		}
 
 		return $this;
 	}

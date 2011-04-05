@@ -11,6 +11,36 @@
 class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 
 	/**
+	 * Remove any test databases.
+	 *
+	 * @return void
+	 */
+	public static function setUpBeforeClass()
+	{
+		// Remove our testing database before writing tests.
+        $mongo = new Mongo;
+
+		$config = Kohana::config('metamongo');
+
+		// Select our database
+		$db = $mongo->{$config->database};
+
+		// Drop it like it's hot.
+		$db->drop();
+	}
+
+	/**
+	 * Remove our test database we played witj
+	 *
+	 * @return void
+	 */
+	public static function tearDownAfterClass()
+	{
+		// Repeat our drop function
+		self::setUpBeforeClass();
+	}
+
+	/**
 	 * Provides test data for test_set_and_get
 	 *
 	 */
@@ -54,7 +84,6 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 			// Only the "likes" array of one comment.
 			array(
 				array(
-				
 					'comments' => array(
 						array(
 							'likes' => array('Joe Bloggs', 'Ted Smith'),
@@ -293,6 +322,26 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 		return array(
 			// $field_data, $check_result, $expected_errors
 			array(
+				// Test explicitly setting an ObjectId
+				array(
+					'_id'           => new MongoId('4d9b16c8ef966fff00000006'),
+					'post_title'    => 'Blog post inserted from ID',
+					'post_slug'     => 'blog-post-from-id',
+					'post_date'     => new MongoDate(strtotime("4th March  2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => 'An excerpt from a blog post added using an explicit ID',
+					'post_content'  => 'Blog post content here.',
+					'post_metadata' => array(
+						'keywords'    => 'specific id, mongoid',
+						'description' => 'Description tag here',
+					)
+				),
+				TRUE,
+				NULL
+			),
+			array(
 				// Complete 
 				array(
 					'post_title'    => 'Example blog post',
@@ -497,6 +546,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @covers MetaMongo_Object::changed
 	 * @covers MetaMongo_Object::original
 	 * @covers MetaMongo_Object::_init_db
+	 * @covers MetaMongo_Object::load
 	 * @dataProvider provider_validate_and_create_data
 	 *
 	 * @param  array   $data   Data to add to the DB
@@ -504,7 +554,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @param  string  $expected_validation_errors    Expected validation error messages
 	 * @return void
 	 */
-	public function test_create_document($data, $validation_status, $expected_validation_errors = NULL)
+	public function test_create_and_load_document($data, $validation_status, $expected_validation_errors = NULL)
 	{
 		$document = new Model_Blogpost($data);
 
@@ -519,15 +569,32 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 			// Ensure we are now loaded
 			$this->assertTrue($document->loaded());
 
+			// Save our new data with the ObjectId
+			$saved_data = $document->get();
+
+			// Ensure that all data has been moved into the $_data variable
+			$this->assertEquals($saved_data, $document->original());
+
 			// Ensure we have no changed data
 			$this->assertempty($document->changed());
 
-			// Add our ObjectId to our $data to ensure that all data has been moved into the $_data variable
-			$data['_id'] = $document->get('_id');
-			$this->assertEquals($data, $document->original());
+			// Test reloading our saved object
+			$this->assertEquals($document->load()->get(), $saved_data);
+			
+			// Test loading from our ID
+			$loaded_object = new Model_Blogpost;
+			$loaded_object->set('_id', $document->original('_id'));
+			$loaded_object->load();
+
+			$this->assertEquals($loaded_object->get(), $document->original());
+			
+			// Test loading from non-unique keys.
+			$loaded_object = new Model_Blogpost($data);
+			$loaded_object->load();
+			$this->assertEquals($loaded_object->get(), $document->original());	
 
 			// Ensure we can't run create() when we already have an ObjectId in our data			
-			$document = new Model_Blogpost($data);
+			$document = new Model_Blogpost($saved_data);
 
 			try
 			{
@@ -535,7 +602,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 			}
 			catch(MetaMongo_Exception $e)
 			{
-				$this->assertSame($e->getMessage(), "To create a new object please remove its ObjectID (_id) field");
+				$this->assertSame($e->getMessage(), "Creating failed: a document with ObjectId '".$document->get('_id')."' exists already.");
 
 				// Assert we're not loaded
 				$this->assertFalse($document->loaded());
@@ -553,7 +620,6 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 			}
 			catch(Validation_Exception $e)
 			{
-				
 				// Ensure an ObjectId hasn't been added to our data
 				$this->assertSame($data, $document->get());
 
@@ -571,4 +637,17 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 		}
 	}
 
+	/**
+	 * Tests how the load() method handles loading with no data
+	 *
+	 * @covers MetaMongo_Object::load
+	 * @expectedException MetaMongo_Exception
+	 * @expectedExceptionMessage No model data supplied
+	 * @return void
+	 */
+	public function test_document_loading_with_no_data()
+	{
+		$document = new Model_Blogpost;
+		$document->load();
+	}
 }
