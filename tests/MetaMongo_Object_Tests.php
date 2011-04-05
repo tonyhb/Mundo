@@ -317,7 +317,111 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 				),
 				TRUE,
 				NULL
-			)
+			),
+			array(
+				// Incorrect post slug (first dimension error)
+				array(
+					'post_title'    => 'Example blog post',
+					'post_slug'     => 'example-blog-post !',
+					'post_date'     => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => '...An excerpt from the post. Boom!',
+					'post_content'  => 'This is the whole post. And this should be an excerpt from the bost. Boom! // End of blog post 1.',
+					'post_metadata' => array(
+						'keywords'    => 'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+						'description' => 'An example description tag for a blog post. Google SERP me plox!',
+					),
+					'comments'      => array(
+						array(
+							'comment'      => 'Comment number 1',
+							'author_name'  => 'Commenter Smith',
+							'author_url'   => 'http://example-commenter.com/',
+							'author_email' => 'commenter.smith@example.com',
+							'likes'        => array('Joe Bloggs', 'Ted Smith'),
+						),
+						array(
+							'comment'      => 'Comment number 2',
+							'author_name'  => 'Commenter Brown',
+							'author_email' => 'commenter.brown@example.com',
+						),
+					),
+				),
+				FALSE,
+				array(
+					'post_slug' => 'post slug must contain only numbers, letters and dashes',
+				),
+			),
+			array(
+				// Invalid embedded object email
+				array(
+					'post_title'    => 'Example blog post',
+					'post_slug'     => 'example-blog-post',
+					'post_date'     => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => '...An excerpt from the post. Boom!',
+					'post_content'  => 'This is the whole post. And this should be an excerpt from the bost. Boom! // End of blog post 1.',
+					'post_metadata' => array(
+						'keywords'    => 'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+						'description' => 'An example description tag for a blog post. Google SERP me plox!',
+					),
+					'comments'      => array(
+						array(
+							'comment'      => 'Comment number 1',
+							'author_name'  => 'Commenter Smith',
+							'author_url'   => 'http://example-commenter.com/',
+							'author_email' => 'commenter.smith@example.com',
+							'likes'        => array('Joe Bloggs', 'Ted Smith'),
+						),
+						array(
+							'comment'      => 'Comment number 2',
+							'author_name'  => 'Commenter Brown',
+							'author_email' => 'incorrect.email@example',
+						),
+					),
+				),
+				FALSE,
+				array(
+					"comments.1.author_email" => "comments author email must be a email address",
+				)
+			),
+			array(
+				// Missing required field in an embedded object
+				array(
+					'post_title'    => 'Example blog post',
+					'post_slug'     => 'example-blog-post',
+					'post_date'     => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => '...An excerpt from the post. Boom!',
+					'post_content'  => 'This is the whole post. And this should be an excerpt from the bost. Boom! // End of blog post 1.',
+					'post_metadata' => array(
+						'keywords'    => 'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+						'description' => 'An example description tag for a blog post. Google SERP me plox!',
+					),
+					'comments'      => array(
+						array(
+							'comment'      => 'Comment number 1',
+							'author_url'   => 'http://example-commenter.com/',
+							'author_email' => 'commenter.smith@example.com',
+							'likes'        => array('Joe Bloggs', 'Ted Smith'),
+						),
+						array(
+							'comment'      => 'Comment number 2',
+							'author_name'  => 'Commenter Brown',
+							'author_email' => 'incorrect.email@example.com',
+						),
+					),
+				),
+				FALSE,
+				array(
+					"comments.0.author_name" => "comments author name must not be empty"
+				)
+			),
 		);
 	}
 
@@ -325,6 +429,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * Validates data that has already been set (from the _merge method)
 	 *
 	 * @covers MetaMongo_Object::validate
+	 * @covers MetaMongo_Object::_extract_rules
 	 * @dataProvider provider_validate_data
 	 * @param   array  $data             array of model data to set
 	 * @param   bool   $check_result     Whether the validation check() method should return true or false

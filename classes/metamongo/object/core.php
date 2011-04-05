@@ -202,12 +202,12 @@ class MetaMongo_Object_Core
 
 	/**
 	 * Loads a Validation object with the rules defined in the model and 
-	 * either the set model data or the data passed as an arguemnt.
+	 * either the set model data or the data passed as an argument.
 	 *
 	 * Note: This function returns a Validation object and does not validate
-	 * data itself. Just run check() on this function's return value. I did
-	 * this because it makes it easier to grab error messages and use the 
-	 * normal Validation library.
+	 * data itself. Just run check() on this function's return value. This is
+	 * because it makes it easier to grab error messages and use the normal
+	 * Validation library.
 	 *
 	 * @param   string $data 
 	 * @return  Validation
