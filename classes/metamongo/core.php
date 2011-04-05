@@ -100,4 +100,16 @@ class MetaMongo_Core
 		return $flat;
 	}
 
+	/**
+	 * Returns whether a variable is an instance of a class
+	 *
+	 * @param  mixed   $object  Variable to test 
+	 * @param  string  $name    Instance type to check for
+	 * @return bool
+	 */
+	public static function instance_of($object, $name)
+	{
+		return is_object($object) && ($object instanceof $name);
+	}
+
 } // End MetaMongo_Core

@@ -83,11 +83,11 @@ class Model_Blogpost extends MetaMongo_Object
 			array('not_empty'),
 		),
 		'author' => array(
-			array('MetaMongo::instance_of', array(':value', 'MongoDate')),
+			array('MetaMongo::instance_of', array(':value', 'MongoId')),
 			array('not_empty'),
 		),
 		'author_name' => array(
-			array('alpha', array(':value', true)),
+		array('regex', array(':value', '/^[\w\s]+$/')),
 		),
 		'author_email' => array(
 			array('not_empty'),
@@ -100,17 +100,17 @@ class Model_Blogpost extends MetaMongo_Object
 			// Reference each embedded object
 			'$' => array(
 				// Each embedded object is as standard from here on out
-				'comment_author' => array(
+				'author_name' => array(
 					array('not_empty'),
 				),
-				'comment_email' => array(
+				'author_email' => array(
 					array('not_empty'),
 					array('email'),
 				),
 				'likes' => array(
 					'$' => array(
 						// Note we don't have field names and jump straight into the rules: this is a flat array
-						array('alpha', array(':value', true)),
+						array('regex', array(':value', '/^[\w\s]+$/')),
 					)
 				)
 			)
