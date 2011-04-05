@@ -52,4 +52,167 @@ class MetaMongoTests extends PHPUnit_Framework_TestCase
 		$object = MetaMongo::factory('blogpost', 'error');
 	}
 
+	/**
+	 * Ensures that the flatten method always returns an empty array when
+	 * alternate data is supplied.
+	 *
+	 */
+	public function test_flatten_returns_empty_array_when_passed_non_array()
+	{
+		$this->assertEquals(MetaMongo::flatten('test'), array());
+		$this->assertEmpty(MetaMongo::flatten('test'));
+	}
+
+	/**
+	 * Provider for test_flatten_method() 
+	 *
+	 */
+	public static function provider_flatten()
+	{
+		return array(
+			// $field_data, $check_result, $expected_errors
+			array(
+				array(
+					'_id'           => new MongoId('4d9b16c8ef966fff00000006'),
+					'post_title'    => 'Blog post inserted from ID',
+					'post_slug'     => 'blog-post-from-id',
+					'post_date'     => new MongoDate(strtotime("4th March  2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => 'An excerpt from a blog post added using an explicit ID',
+					'post_content'  => 'Blog post content here.',
+					'post_metadata' => array(
+						'keywords'    => 'specific id, mongoid',
+						'description' => 'Description tag here',
+					)
+				),
+				array(
+					'_id'           => new MongoId('4d9b16c8ef966fff00000006'),
+					'post_title'    => 'Blog post inserted from ID',
+					'post_slug'     => 'blog-post-from-id',
+					'post_date'     => new MongoDate(strtotime("4th March  2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => 'An excerpt from a blog post added using an explicit ID',
+					'post_content'  => 'Blog post content here.',
+					'post_metadata.keywords'    => 'specific id, mongoid',
+					'post_metadata.description' => 'Description tag here',
+				)
+			),
+			array(
+				array(
+					'post_title'    => 'Example blog post',
+					'post_slug'     => 'example-blog-post',
+					'post_date'     => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => '...An excerpt from the post. Boom!',
+					'post_content'  => 'This is the whole post. And this should be an excerpt from the bost. Boom! // End of blog post 1.',
+					'post_metadata' => array(
+						'keywords'    => 'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+						'description' => 'An example description tag for a blog post. Google SERP me plox!',
+					),
+					'comments'      => array(
+						array(
+							'comment'      => 'Comment number 1',
+							'author_name'  => 'Commenter Smith',
+							'author_url'   => 'http://example-commenter.com/',
+							'author_email' => 'commenter.smith@example.com',
+							'likes'        => array('Joe Bloggs', 'Ted Smith'),
+						),
+						array(
+							'comment'      => 'Comment number 2',
+							'author_name'  => 'Commenter Brown',
+							'author_email' => 'commenter.brown@example.com',
+						),
+					),
+				),
+				array(
+					'post_title'    => 'Example blog post',
+					'post_slug'     => 'example-blog-post',
+					'post_date'     => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => '...An excerpt from the post. Boom!',
+					'post_content'  => 'This is the whole post. And this should be an excerpt from the bost. Boom! // End of blog post 1.',
+					'post_metadata.keywords'    => 'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+					'post_metadata.description' => 'An example description tag for a blog post. Google SERP me plox!',
+					'comments.0.comment'      => 'Comment number 1',
+					'comments.0.author_name'  => 'Commenter Smith',
+					'comments.0.author_url'   => 'http://example-commenter.com/',
+					'comments.0.author_email' => 'commenter.smith@example.com',
+					'comments.0.likes.0'      => 'Joe Bloggs',
+					'comments.0.likes.1'      => 'Ted Smith',
+					'comments.1.comment'      => 'Comment number 2',
+					'comments.1.author_name'  => 'Commenter Brown',
+					'comments.1.author_email' => 'commenter.brown@example.com',
+				),
+			),
+		);
+	}
+
+	/**
+	 * Ensures the flatten() method works as expected
+	 *
+	 * @covers MetaMongo_Core::flatten
+	 * @covers MetaMongo_Core::_flatten
+	 * @dataProvider provider_flatten
+	 * @param  array  $argument  Array to pass to flatten
+	 * @param  array  $expected  Expected return from flatten
+	 */
+	public function test_flatten_method($argument, $expected)
+	{
+		$this->assertEquals(MetaMongo::flatten($argument), $expected);
+	}
+
+	/**
+	 * Provider for test_instance_of()
+	 *
+	 */
+	public static function provider_instance_of()
+	{
+		return array(
+			// $object, $instance_name, $expected_result
+			array(
+				new MongoId(),
+				'MongoId',
+				TRUE
+			),
+			array(
+				new MongoDate(),
+				'MongoDate',
+				TRUE
+			),
+			array(
+				new StdClass(),
+				'MongoId',
+				False
+			),
+			array(
+				'hello',
+				'MongoId',
+				False,
+			)
+		);
+	}
+
+	/**
+	 * Ensure the instance_of() method returns the correct results
+	 *
+	 * @covers MetaMongo_Core::instance_of
+	 * @dataProvider provider_instance_of
+	 * @param string $object 
+	 * @param string $instance_name 
+	 * @param string $expected_result 
+	 * @return void
+	 * @author Tony Holdstock-Brown
+	 */
+	public function test_instance_of($object, $instance_name, $expected_result)
+	{
+		$this->assertEquals(MetaMongo::instance_of($object, $instance_name), $expected_result);
+	}
 }
