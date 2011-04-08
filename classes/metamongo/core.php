@@ -101,6 +101,39 @@ class MetaMongo_Core
 	}
 
 	/**
+	 * Takes dotted-path arrays and rebuilds it as an associative array.
+	 *
+	 * For example:
+	 *    array(
+	 *       'container.name' => 'Name here',
+	 *       'container.data' => 'Data here',
+	 *     );
+	 *
+	 * becomes
+	 *    array(
+	 *       'container' => array(
+	 *           'name' => 'Name here',
+	 *           'data' => 'Data here',
+	 *       ),
+	 *    );
+	 *
+	 * @param  array $data 
+	 * @return void
+	 * @author Tony Holdstock-Brown
+	 */
+	public static function inflate($data)
+	{
+		$result = array();
+
+		foreach ($data as $path => $value)
+		{
+			Arr::set_path($result, $path, $value);
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Returns whether a variable is an instance of a class
 	 *
 	 * @param  mixed   $object  Variable to test 

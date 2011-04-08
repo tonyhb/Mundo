@@ -60,6 +60,13 @@ class MetaMongo_Object_Core
 	protected $_db;
 
 	/**
+	 * The "safe" parameter for DB queries
+	 *
+	 * @var  mixed
+	 */
+	protected $_safe;
+
+	/**
 	 * Initialise our data
 	 *
 	 * @param array $data 
@@ -139,7 +146,7 @@ class MetaMongo_Object_Core
 				$field = array_pop($paths);
 
 				// Take the remaining keys as our parent path and array path
-				$parent_path = $this->__array_path = implode('.', $paths);
+				$parent_path = implode('.', $paths);
 			}
 
 			// Set our working path as either the field name or the path to our field.
@@ -157,8 +164,8 @@ class MetaMongo_Object_Core
 					// Exchange numerical paths for the '$' indicator.
 					if ($object = Arr::path($this->_fields, preg_replace('#\.[0-9]+#', '.$', $parent_path)))
 					{
-						// Check to see that the field exists or we have an array that allows any kind of data.
-						$field_exists = in_array($field, $object) || $object[0] == '$';
+						// Check to see that the field exists || we have an array that allows any kind of data || we are unsetting an embedded object
+						$field_exists = in_array($field, $object) || $object[0] == '$' || (array_key_exists($field, $object) AND $value === NULL);
 					}
 					else
 					{
@@ -172,8 +179,8 @@ class MetaMongo_Object_Core
 				}
 				else
 				{
-					// CHeck to see if the value exists in the first array dimension
-					$field_exists = in_array($field, $this->_fields);
+					// CHeck to see if the value exists in the first array dimension, or if the array key exists for setting as embedded objects as null
+					$field_exists = in_array($field, $this->_fields) || (array_key_exists($field, $this->_fields) AND $value === NULL);
 				}
 
 				if ( ! $field_exists)
@@ -185,6 +192,93 @@ class MetaMongo_Object_Core
 
 				// Set our data
 				Arr::set_path($this->_changed, $path, $value);
+			}
+		}
+	}
+
+	/**
+	 * Allow setting our field values by overloading, as in:
+	 *
+	 *    $model->field = $value;
+	 *
+	 * @param  string  $field   Field name
+	 * @param  string  $value  Value
+	 * @return void
+	 */
+	public function __set($field, $value)
+	{
+		$this->set($field, $value);
+	}
+
+	/**
+	 * Allow retrieving field values via overloading.
+	 *
+	 * !! Note: Returns NULL if field does not exist.
+	 *
+	 * @param  string  $field  name of field to retrieve
+	 * @return mixed
+	 */
+	public function __get($field)
+	{
+		return $this->get($field);
+	}
+
+
+	/**
+	 * Checks if a field's value is set
+	 *
+	 * @param  string  $field field name
+	 * @return bool
+	 */
+	public function __isset($field)
+	{
+		return ! ($this->get($field) === NULL);
+	}
+
+	/**
+	 * Unset a field's data (ie. reset it's data to NULL)
+	 *
+	 * @param  string $field  Field name to unset
+	 * @return void
+	 */
+	public function __unset($field)
+	{
+		// If there isn't any original data or changed data set, return
+		if ( ! $this->original($field) AND ! $this->changed($field))
+			return;
+
+		// If the field has been changed and there is no original data, we need to remove it from our changed array
+		$changed = $this->changed($field) AND ! $this->original($field);
+
+		// Set our $field to NULL
+		$this->set(array($field => NULL));
+
+		if ($changed)
+		{
+			if (strpos($field, '.') !== FALSE)
+			{
+				// We're using dot notation to unset an embedded object, so separate our path string.
+				$paths = explode('.', $field);
+
+				// Pop the field name we are unsetting (the last element)
+				$field = array_pop($paths);
+
+				// Take the remaining keys as our parent path and array path
+				$field_path = implode('.', $paths);
+
+				// Get the embedded object we are removing values from 
+				$changed = Arr::path($this->_changed, $field_path);
+
+				// Unset our data from the embedded object
+				unset($changed[$field]);
+
+				// Reset our altered embedded object
+				Arr::set_path($this->_changed, $field_path, $changed);
+			}
+			else
+			{
+				// Simple document field, just unset it
+				unset($this->_changed[$field]);
 			}
 		}
 	}

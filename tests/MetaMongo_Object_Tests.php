@@ -44,7 +44,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * Provides test data for test_set_and_get
 	 *
 	 */
-	public static function set_and_get()
+	public static function provider_set_and_get()
 	{
 		// $data, $expected_error (null if it should succeed)
 		return array(
@@ -186,7 +186,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @covers MetaMongo_Object::_set
 	 * @covers MetaMongo_Object::get
 	 * @covers MetaMongo_Object::changed
-	 * @dataProvider set_and_get
+	 * @dataProvider provider_set_and_get
 	 * @param  array  $data             The array of data to set
 	 * @param  mixed  $expected_error   Null if setting should pass, otherwise the error exception message.
 	 * @param  array  $expected_result  The expected result of get() if it isn't the same as $data.
@@ -227,6 +227,115 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 				$this->assertSame($metamongo->get(), $data);
 				$this->assertSame($metamongo->changed(), $data);
 			}
+		}
+	}
+
+	/**
+	 * Tests that overloading properties works the same as setting and getting single fields
+	 *
+	 * @test
+	 * @covers MetaMongo_Object::set
+	 * @covers MetaMongo_Object::_set
+	 * @covers MetaMongo_Object::__set
+	 * @covers MetaMongo_Object::get
+	 * @covers MetaMongo_Object::__get
+	 * @covers MetaMongo_Object::__isset
+	 * @covers MetaMongo_Object::changed
+	 * @dataProvider provider_set_and_get
+	 * @param   string  $data 
+	 * @param   string  $expected_error 
+	 * @param   string  $expected_result 
+	 * @return  void
+	 */
+	public function test_overloading_set_get_and_isset($data, $expected_error, $expected_result = NULL)
+	{
+
+		$document = new Model_Blogpost;
+
+		if ($expected_error)
+		{
+			foreach ($data as $field => $value)
+			{
+				try
+				{
+					// Set each single field via overloading
+					$document->$field = $value;
+				}
+				catch(Exception $e)
+				{
+					// Ensure our error message is correct and it failed for the right reasons.
+					$this->assertEquals($e->getMessage(), $expected_error);
+				}
+			}
+		}
+		else
+		{
+			foreach ($data as $field => $value)
+			{
+				// Ensure __isset returns false with no data
+				$this->assertFalse(isset($document->$field));
+
+				// Set each single field via overloading
+				$document->$field = $value;
+
+				// Assert overloading method __isset returns true when data is set
+				$this->assertTrue(isset($document->$field));
+
+				// Ensure getting data through normal methods and overloading works, hence the data was added OK.
+				$this->assertEquals($document->get($field), $data[$field]);
+				$this->assertEquals($document->$field, $document->get($field));
+			}
+
+			if ($expected_result)
+			{
+				// Ensure the data is the same as the expected result
+				$this->assertSame($document->get(), $expected_result);
+				$this->assertSame($document->changed(), $expected_result);
+			}
+			else
+			{
+				// Ensure the data is the same as we put in.
+				$this->assertSame($document->get(), $data);
+				$this->assertSame($document->changed(), $data);
+			}
+		}
+	}
+
+	/**
+	 * Tests that the overloading method __unset works as expected with unloaded models
+	 *
+	 * @test
+	 * @covers MetaMongo_Object::__isset
+	 * @covers MetaMongo_Object::__unset
+	 * @dataProvider provider_set_and_get
+	 * @param string $data 
+	 * @param string $expected_error 
+	 * @return void
+	 */
+	public function test_overloading_unloaded_unset($data, $expected_error, $expected_result = NULL)
+	{
+		if ($expected_error)
+		{
+			// Skip non-valid data, as this is already tested in test_overloading_set_get_and_isset.
+			return;
+		}
+
+		$document = new Model_Blogpost;
+
+		// Set and unset each piece of data in series
+		foreach ($data as $field => $value)
+		{
+			// Just double-check that, in case of some mysterious magic, we haven't got any data
+			$this->assertNull($document->$field);
+
+			$document->set($field, $value);
+
+			$this->assertEquals($document->get($field), $data[$field]);
+
+			// And unset our data
+			unset($document->$field);
+
+			$this->assertNull($document->changed($field));
 		}
 	}
 
@@ -653,6 +762,52 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 			$this->fail("Data should have failed validation but an exception was not raised");
 
 		}
+	}
+
+	/**
+	 * Tests that the overloading method __unset works as expected with loaded models
+	 *
+	 * @test
+	 * @covers MetaMongo_Object::__isset
+	 * @covers MetaMongo_Object::__unset
+	 * @dataProvider provider_validate_and_create_data
+	 * @param string $data 
+	 * @param string $expected_error 
+	 * @return void
+	 * @author Tony Holdstock-Brown
+	 */
+	public function test_overloading_loaded_unset($data, $validation_status, $expected_validation_errors = NULL)
+	{
+		if ( ! $validation_status)
+			return;
+
+		// Create our model
+		$document = new Model_Blogpost;
+
+		// Set our data for loading the model from Mongo
+		$document->set($data);
+
+		$document->load();
+
+		// Ensure we've got loaded data
+		$this->assertTrue($document->loaded());
+		$this->assertInstanceOf('MongoId', $document->get('_id'));
+		$this->assertEmpty($document->changed());
+
+		foreach($data as $field => $value)
+		{
+			// Unset our already saved data
+			unset($document->$field);
+
+			$this->assertNull($document->changed($field));
+			$this->assertEquals($document->original($field), $data[$field]);
+		}
+
+		// Ensure that our array keys for the unset fields exist in changed
+		$changed_keys = array_keys($document->changed());
+		$data_keys = array_keys($data);
+
+		$this->assertEquals($changed_keys, $data_keys);
 	}
 
 	/**
