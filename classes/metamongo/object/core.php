@@ -60,6 +60,13 @@ class MetaMongo_Object_Core
 	protected $_db;
 
 	/**
+	 * The "safe" parameter for DB queries
+	 *
+	 * @var  mixed
+	 */
+	protected $_safe;
+
+	/**
 	 * Initialise our data
 	 *
 	 * @param array $data 
@@ -139,7 +146,7 @@ class MetaMongo_Object_Core
 				$field = array_pop($paths);
 
 				// Take the remaining keys as our parent path and array path
-				$parent_path = $this->__array_path = implode('.', $paths);
+				$parent_path = implode('.', $paths);
 			}
 
 			// Set our working path as either the field name or the path to our field.
@@ -187,6 +194,33 @@ class MetaMongo_Object_Core
 				Arr::set_path($this->_changed, $path, $value);
 			}
 		}
+	}
+
+	/**
+	 * Allow setting our field values by overloading, as in:
+	 *
+	 *    $model->field = $value;
+	 *
+	 * @param  string  $field   Field name
+	 * @param  string  $value  Value
+	 * @return void
+	 */
+	public function __set($field, $value)
+	{
+		$this->set($field, $value);
+	}
+
+	/**
+	 * Allow retrieving field values via overloading.
+	 *
+	 * !! Note: Returns NULL if field does not exist.
+	 *
+	 * @param  string  $field  name of field to retrieve
+	 * @return mixed
+	 */
+	public function __get($field)
+	{
+		return $this->get($field);
 	}
 
 	/**

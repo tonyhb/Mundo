@@ -44,7 +44,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * Provides test data for test_set_and_get
 	 *
 	 */
-	public static function set_and_get()
+	public static function provider_set_and_get()
 	{
 		// $data, $expected_error (null if it should succeed)
 		return array(
@@ -186,7 +186,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @covers MetaMongo_Object::_set
 	 * @covers MetaMongo_Object::get
 	 * @covers MetaMongo_Object::changed
-	 * @dataProvider set_and_get
+	 * @dataProvider provider_set_and_get
 	 * @param  array  $data             The array of data to set
 	 * @param  mixed  $expected_error   Null if setting should pass, otherwise the error exception message.
 	 * @param  array  $expected_result  The expected result of get() if it isn't the same as $data.
@@ -226,6 +226,70 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 				// Ensure the data is the same as we put in.
 				$this->assertSame($metamongo->get(), $data);
 				$this->assertSame($metamongo->changed(), $data);
+			}
+		}
+	}
+
+	/**
+	 * Tests that overloading properties works the same as setting and getting single fields
+	 *
+	 * @test
+	 * @covers MetaMongo_Object::set
+	 * @covers MetaMongo_Object::_set
+	 * @covers MetaMongo_Object::__set
+	 * @covers MetaMongo_Object::get
+	 * @covers MetaMongo_Object::__get
+	 * @covers MetaMongo_Object::changed
+	 * @dataProvider provider_set_and_get
+	 * @param   string  $data 
+	 * @param   string  $expected_error 
+	 * @param   string  $expected_result 
+	 * @return  void
+	 */
+	public function test_overloading_set_and_get($data, $expected_error, $expected_result = NULL)
+	{
+
+		$document = new Model_Blogpost;
+
+		if ($expected_error)
+		{
+			foreach($data as $field => $value)
+			{
+				try
+				{
+					// Set each single field via overloading
+					$document->$field = $value;
+				}
+				catch(Exception $e)
+				{
+					// Ensure our error message is correct and it failed for the right reasons.
+					$this->assertEquals($e->getMessage(), $expected_error);
+				}
+			}
+		}
+		else
+		{
+			foreach($data as $field => $value)
+			{
+				// Set each single field via overloading
+				$document->$field = $value;
+
+				// Ensure getting data through normal methods and overloading works, hence the data was added OK.
+				$this->assertEquals($document->get($field), $data[$field]);
+				$this->assertEquals($document->$field, $document->get($field));
+			}
+
+			if ($expected_result)
+			{
+				// Ensure the data is the same as the expected result
+				$this->assertSame($document->get(), $expected_result);
+				$this->assertSame($document->changed(), $expected_result);
+			}
+			else
+			{
+				// Ensure the data is the same as we put in.
+				$this->assertSame($document->get(), $data);
+				$this->assertSame($document->changed(), $data);
 			}
 		}
 	}
