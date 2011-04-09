@@ -823,4 +823,64 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 		$document = new Model_Blogpost;
 		$document->load();
 	}
+
+	public function provider_update()
+	{
+		return array(
+			array(
+				// Complete data to load, copied from provider_validate_and_create_data
+				array(
+					'post_title'    => 'Example blog post',
+					'post_slug'     => 'example-blog-post',
+					'post_date'     => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => '...An excerpt from the post. Boom!',
+					'post_content'  => 'This is the whole post. And this should be an excerpt from the bost. Boom! // End of blog post 1.',
+					'post_metadata' => array(
+						'keywords'    => 'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+						'description' => 'An example description tag for a blog post. Google SERP me plox!',
+					),
+					'comments'      => array(
+						array(
+							'comment'      => 'Comment number 1',
+							'author_name'  => 'Commenter Smith',
+							'author_url'   => 'http://example-commenter.com/',
+							'author_email' => 'commenter.smith@example.com',
+							'likes'        => array('Joe Bloggs', 'Ted Smith'),
+						),
+						array(
+							'comment'      => 'Comment number 2',
+							'author_name'  => 'Commenter Brown',
+							'author_email' => 'commenter.brown@example.com',
+						),
+					),
+				),
+				// What we're changing data to
+				array(
+					'post_title'    => 'New post title',
+					'post_date'     => new MongoDate(strtotime("26th March 2011, 11:24AM")),
+					'post_metadata' => array(
+						'keywords' => 'new keywords, updated object',
+					),
+					// mimic __unset
+					'post_excerpt'  => NULL,
+					// Remove one embedded object
+					'comments'      => array(
+						array(
+							'comment'      => 'Comment number 1',
+							'author_name'  => 'Commenter Smith',
+							'author_url'   => 'http://example-commenter.com/',
+							'author_email' => 'commenter.smith@example.com',
+							'likes'        => array('Joe Bloggs', 'Ted Smith'),
+						),
+					),
+				)
+				// Expected query: TODO
+				TRUE,
+				NULL
+			),
+		)
+	}
 }
