@@ -9,13 +9,13 @@
 	> 
 
 	<php>
-		<server name="HTTP_HOST" value="metamongo.local"/>
+		<server name="HTTP_HOST" value="Mundo.local"/>
 	</php>
 
 	<testsuites> 
-      <testsuite name="MetaMongo Tests"> 
-		<file>./MetaMongoTests.php</file>
-		<file>./MetaMongo_Object_Tests.php</file>
+      <testsuite name="Mundo Tests"> 
+		<file>./Mundo_Tests.php</file>
+		<file>./Mundo_Object_Tests.php</file>
 	  </testsuite> 
     </testsuites> 
 

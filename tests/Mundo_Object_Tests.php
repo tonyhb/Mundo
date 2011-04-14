@@ -1,14 +1,14 @@
 <?php
 
 /**
- * Tests the MetaMongo_Object class, which
+ * Tests the Mundo_Object class, which
  *
- * @package MetaMongo
- * @subpackage MetaMongo_Object
+ * @package Mundo
+ * @subpackage Mundo_Object
  * @category Tests
  * @author Tony Holdstock-Brown
  */
-class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
+class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 
 	/**
 	 * Remove any test databases.
@@ -20,7 +20,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 		// Remove our testing database before writing tests.
         $mongo = new Mongo;
 
-		$config = Kohana::config('metamongo');
+		$config = Kohana::config('Mundo');
 
 		// Select our database
 		$db = $mongo->{$config->database};
@@ -150,7 +150,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 					'author'     => new MongoId('4d965966ef966f0916000000'),
 					'undefined'  => 'Undefined field which should cause setting to fail.',
 				),
-				// MetaMongo should throw an error saying our field doesn't exist
+				// Mundo should throw an error saying our field doesn't exist
 				"Field 'undefined' does not exist", 
 			),
 			// Data with an undefined field in an embedded object
@@ -171,7 +171,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 						),
 					),
 				),
-				// MetaMongo should throw an error saying our field doesn't exist
+				// Mundo should throw an error saying our field doesn't exist
 				"Field 'comments.0.embedded' does not exist", 
 			),
 		);
@@ -182,10 +182,10 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 *
 	 *
 	 * @test
-	 * @covers MetaMongo_Object::set
-	 * @covers MetaMongo_Object::_set
-	 * @covers MetaMongo_Object::get
-	 * @covers MetaMongo_Object::changed
+	 * @covers Mundo_Object::set
+	 * @covers Mundo_Object::_set
+	 * @covers Mundo_Object::get
+	 * @covers Mundo_Object::changed
 	 * @dataProvider provider_set_and_get
 	 * @param  array  $data             The array of data to set
 	 * @param  mixed  $expected_error   Null if setting should pass, otherwise the error exception message.
@@ -195,14 +195,14 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	public function test_set_and_get($data, $expected_error, $expected_result = NULL)
 	{
 
-		$metamongo = new Model_Blogpost;
+		$Mundo = new Model_Blogpost;
 
 		if ($expected_error)
 		{
 			try
 			{
 				// Setting our data should fail
-				$metamongo->set($data);
+				$Mundo->set($data);
 			}
 			catch (Exception $e)
 			{
@@ -213,19 +213,19 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 		else
 		{
 			// Set our data
-			$metamongo->set($data);
+			$Mundo->set($data);
 
 			if ($expected_result)
 			{
 				// Ensure the data is the same as the expected result
-				$this->assertSame($metamongo->get(), $expected_result);
-				$this->assertSame($metamongo->changed(), $expected_result);
+				$this->assertSame($Mundo->get(), $expected_result);
+				$this->assertSame($Mundo->changed(), $expected_result);
 			}
 			else
 			{
 				// Ensure the data is the same as we put in.
-				$this->assertSame($metamongo->get(), $data);
-				$this->assertSame($metamongo->changed(), $data);
+				$this->assertSame($Mundo->get(), $data);
+				$this->assertSame($Mundo->changed(), $data);
 			}
 		}
 	}
@@ -234,13 +234,13 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * Tests that overloading properties works the same as setting and getting single fields
 	 *
 	 * @test
-	 * @covers MetaMongo_Object::set
-	 * @covers MetaMongo_Object::_set
-	 * @covers MetaMongo_Object::__set
-	 * @covers MetaMongo_Object::get
-	 * @covers MetaMongo_Object::__get
-	 * @covers MetaMongo_Object::__isset
-	 * @covers MetaMongo_Object::changed
+	 * @covers Mundo_Object::set
+	 * @covers Mundo_Object::_set
+	 * @covers Mundo_Object::__set
+	 * @covers Mundo_Object::get
+	 * @covers Mundo_Object::__get
+	 * @covers Mundo_Object::__isset
+	 * @covers Mundo_Object::changed
 	 * @dataProvider provider_set_and_get
 	 * @param   string  $data 
 	 * @param   string  $expected_error 
@@ -305,8 +305,8 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * Tests that the overloading method __unset works as expected with unloaded models
 	 *
 	 * @test
-	 * @covers MetaMongo_Object::__isset
-	 * @covers MetaMongo_Object::__unset
+	 * @covers Mundo_Object::__isset
+	 * @covers Mundo_Object::__unset
 	 * @dataProvider provider_set_and_get
 	 * @param string $data 
 	 * @param string $expected_error 
@@ -371,10 +371,10 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * Test setting and getting single fields at once works as expected
 	 *
 	 * @test
-	 * @covers MetaMongo_Object::get
-	 * @covers MetaMongo_Object::set
-	 * @covers MetaMongo_Object::_set
-	 * @covers MetaMongo_Object::changed
+	 * @covers Mundo_Object::get
+	 * @covers Mundo_Object::set
+	 * @covers Mundo_Object::_set
+	 * @covers Mundo_Object::changed
 	 * @dataProvider provider_single_set_and_get
 	 * @param  string  $field            Name of field we are setting
 	 * @param  string  $value            Value of the field
@@ -383,14 +383,14 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 */
 	public function test_single_set_and_get($field, $value, $expected_error, $expected_result = NULL)
 	{
-		$metamongo = new Model_Blogpost;
+		$Mundo = new Model_Blogpost;
 
 		if ($expected_error)
 		{
 			try
 			{
 				// Setting our data should fail
-				$metamongo->set($field, $value);
+				$Mundo->set($field, $value);
 			}
 			catch (Exception $e)
 			{
@@ -401,21 +401,21 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 		else
 		{
 			// Set our data
-			$metamongo->set($field, $value);
+			$Mundo->set($field, $value);
 
 			if ($expected_result)
 			{
 				// Ensure the data is the same as the expected result
-				$this->assertSame($metamongo->get($field), $value);
-				$this->assertSame($metamongo->get(), $expected_result);
-				$this->assertSame($metamongo->changed($field), $value);
+				$this->assertSame($Mundo->get($field), $value);
+				$this->assertSame($Mundo->get(), $expected_result);
+				$this->assertSame($Mundo->changed($field), $value);
 			}
 			else
 			{
 				// Ensure the data is the same as we put in.
-				$this->assertSame($metamongo->get($field), $value);
-				$this->assertSame($metamongo->get(), array($field => $value));
-				$this->assertSame($metamongo->changed(), array($field => $value));
+				$this->assertSame($Mundo->get($field), $value);
+				$this->assertSame($Mundo->get(), array($field => $value));
+				$this->assertSame($Mundo->changed(), array($field => $value));
 			}
 		}
 	}
@@ -611,8 +611,8 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	/**
 	 * Validates data that has already been set (from the _merge method)
 	 *
-	 * @covers MetaMongo_Object::validate
-	 * @covers MetaMongo_Object::_extract_rules
+	 * @covers Mundo_Object::validate
+	 * @covers Mundo_Object::_extract_rules
 	 * @dataProvider provider_validate_and_create_data
 	 *
 	 * @param   array  $data             array of model data to set
@@ -622,10 +622,10 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 */
 	public function test_validate_set_data($data, $check_result, $expected_errors)
 	{
-		$metamongo = new Model_Blogpost($data);
+		$Mundo = new Model_Blogpost($data);
 
 		// Valdiate() returns a validation instance
-		$validation = $metamongo->validate();
+		$validation = $Mundo->validate();
 
 		$this->assertSame($validation->check(), $check_result);
 
@@ -639,7 +639,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * Validates data that is passed as an argument to the validate method
 	 *
 	 * @test
-	 * @covers MetaMongo_Object::validate
+	 * @covers Mundo_Object::validate
 	 * @dataProvider provider_validate_and_create_data
 	 *
 	 * @param   array  $data             array of model data to set
@@ -649,10 +649,10 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 */
 	public function test_validate_array_data($data, $check_result, $expected_errors)
 	{
-		$metamongo = new Model_Blogpost;
+		$Mundo = new Model_Blogpost;
 
 		// Valdiate() returns a validation instance
-		$validation = $metamongo->validate($data);
+		$validation = $Mundo->validate($data);
 
 		$this->assertSame($validation->check(), $check_result);
 
@@ -668,12 +668,12 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * does not pass the validation check.
 	 *
 	 * @test
-	 * @covers MetaMongo_Object::create
-	 * @covers MetaMongo_Object::loaded
-	 * @covers MetaMongo_Object::changed
-	 * @covers MetaMongo_Object::original
-	 * @covers MetaMongo_Object::_init_db
-	 * @covers MetaMongo_Object::load
+	 * @covers Mundo_Object::create
+	 * @covers Mundo_Object::loaded
+	 * @covers Mundo_Object::changed
+	 * @covers Mundo_Object::original
+	 * @covers Mundo_Object::_init_db
+	 * @covers Mundo_Object::load
 	 * @dataProvider provider_validate_and_create_data
 	 *
 	 * @param  array   $data   Data to add to the DB
@@ -727,7 +727,7 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 			{
 				$document->create();
 			}
-			catch(MetaMongo_Exception $e)
+			catch(Mundo_Exception $e)
 			{
 				$this->assertSame($e->getMessage(), "Creating failed: a document with ObjectId '".$document->get('_id')."' exists already.");
 
@@ -768,8 +768,8 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * Tests that the overloading method __unset works as expected with loaded models
 	 *
 	 * @test
-	 * @covers MetaMongo_Object::__isset
-	 * @covers MetaMongo_Object::__unset
+	 * @covers Mundo_Object::__isset
+	 * @covers Mundo_Object::__unset
 	 * @dataProvider provider_validate_and_create_data
 	 * @param string $data 
 	 * @param string $expected_error 
@@ -813,8 +813,8 @@ class MetaMongo_Object_Tests extends PHPUnit_Framework_TestCase {
 	/**
 	 * Tests how the load() method handles loading with no data
 	 *
-	 * @covers MetaMongo_Object::load
-	 * @expectedException MetaMongo_Exception
+	 * @covers Mundo_Object::load
+	 * @expectedException Mundo_Exception
 	 * @expectedExceptionMessage No model data supplied
 	 * @return void
 	 */
