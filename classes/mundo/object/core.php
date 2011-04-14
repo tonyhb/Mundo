@@ -1,21 +1,21 @@
 <?php defined('SYSPATH') or die('No direct script access.');
 
 /**
- * Core functions for the MetaMongo objects, including data manipulation,
+ * Core functions for the Mundo objects, including data manipulation,
  * database updates and database searching.
  *
- * @package MetaMongo
- * @subpackage MetaMongo_Object
+ * @package Mundo
+ * @subpackage Mundo_Object
  * @author Tony Holdstock-Brown
  **/
-class MetaMongo_Object_Core
+class Mundo_Object_Core
 {
 
 	/**
 	 * This is the name of the collection we're saving to in MongoDB.
 	 *
 	 * !! Note: This string becomes a MongoCollection instance once _init_db()
-	 *          has been called (see MetaMongo_Core for this method).
+	 *          has been called (see Mundo_Core for this method).
 	 *
 	 * @var string
 	 */
@@ -76,7 +76,7 @@ class MetaMongo_Object_Core
 		if ( ! is_array($data))
 		{
 			// Only accept data in an array
-			throw new MetaMongo_Exception("Arrays are the only accepted arguments when constructing MetaMongo Models");
+			throw new Mundo_Exception("Arrays are the only accepted arguments when constructing Mundo Models");
 		}
 
 		// Set our data
@@ -187,7 +187,7 @@ class MetaMongo_Object_Core
 				{
 					// Add the path to the field name to show where the error occurred
 					$field = ($parent_path) ? $parent_path.'.'.$field : $field;
-					throw new MetaMongo_Exception("Field ':field' does not exist", array(':field' => $field));
+					throw new Mundo_Exception("Field ':field' does not exist", array(':field' => $field));
 				}
 
 				// Set our data
@@ -362,7 +362,7 @@ class MetaMongo_Object_Core
 			$data = $this->_merge();
 		}
 
-		$flat_data = MetaMongo::flatten($data);
+		$flat_data = Mundo::flatten($data);
 
 		$validation = Validation::factory($flat_data);
 
@@ -473,7 +473,7 @@ class MetaMongo_Object_Core
 	 * Creates a new document in our collection
 	 *
 	 * @return  mixed  $this
-	 * @throws  mixed  Validation_Exception, MetaMongo_Exception
+	 * @throws  mixed  Validation_Exception, Mundo_Exception
 	 */
 	public function create()
 	{
@@ -494,7 +494,7 @@ class MetaMongo_Object_Core
 			if($object->load($this->get('_id'))->loaded())
 			{
 				// We cannot create a document with a duplicate ID
-				Throw new MetaMongo_Exception("Creating failed: a document with ObjectId ':object_id' exists already.", array(":object_id" => $this->get('_id')));
+				Throw new Mundo_Exception("Creating failed: a document with ObjectId ':object_id' exists already.", array(":object_id" => $this->get('_id')));
 			}
 
 			// Garbage collection
@@ -544,7 +544,7 @@ class MetaMongo_Object_Core
 		}
 
 		// Get our configuration information
-		$config = Kohana::config('metamongo');
+		$config = Kohana::config('Mundo');
 
 		// Load and connect to mongo
 		$this->_mongo = new Mongo();
@@ -580,7 +580,7 @@ class MetaMongo_Object_Core
 		elseif ( ! $this->changed() AND ! $this->loaded())
 		{
 			// No data to query with
-			throw new MetaMongo_Exception("No model data supplied");
+			throw new Mundo_Exception("No model data supplied");
 		}
 		elseif ( ! $this->changed())
 		{
@@ -611,4 +611,4 @@ class MetaMongo_Object_Core
 		return $this;
 	}
 
-} // End MetaMongo_Object_Core
+} // End Mundo_Object_Core

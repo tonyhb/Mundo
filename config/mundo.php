@@ -7,21 +7,21 @@ switch(Kohana::$environment)
 	case Kohana::STAGING:
 		// Staging & production database
 		$enviromnent_settings = array(
-			'database'  => 'metamongo-production',
+			'database'  => 'Mundo-production',
 		);
 		break;
 
 	case Kohana::TESTING:
 		// Testing database
 		$enviromnent_settings = array(
-			'database'  => 'metamongo-testing',
+			'database'  => 'Mundo-testing',
 		);
 		break;
 
 	case Kohana::DEVELOPMENT:
 		// Development database
 		$enviromnent_settings = array(
-			'database'  => 'metamongo-dev',
+			'database'  => 'Mundo-dev',
 		);
 }
 
