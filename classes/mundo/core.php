@@ -1,22 +1,22 @@
 <?php defined('SYSPATH') or die('No direct script access.');
 
 /**
- * Base functions for MetaMongo. This class handles creation of models as well
+ * Base functions for Mundo. This class handles creation of models as well
  * as standard validation and conversion functions for models.
  *
- * @package MetaMongo
+ * @package Mundo
  * @author Tony Holdstock-Brown
  **/
-class MetaMongo_Core
+class Mundo_Core
 {
 
 	const ASC = 1;
 	const DESC = -1;
 
 	/**
-	 * Return a MetaMongo_Object class with some initial $data.
+	 * Return a Mundo_Object class with some initial $data.
 	 *
-	 * @return  MetaMongo_Object
+	 * @return  Mundo_Object
 	 * @author  Tony Holdstock-Brown
 	 **/
 	public static function factory($model, $data = array())
@@ -145,4 +145,4 @@ class MetaMongo_Core
 		return is_object($object) && ($object instanceof $name);
 	}
 
-} // End MetaMongo_Core
+} // End Mundo_Core

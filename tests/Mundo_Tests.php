@@ -3,22 +3,22 @@
 include __DIR__.'/test_data/blogpost.php';
 
 /**
- * Tests the MetaMongo class
+ * Tests the Mundo class
  *
- * @package MetaMongo
+ * @package Mundo
  * @category Tests
  * @author Tony Holdstock-Brown
  */
-class MetaMongoTests extends PHPUnit_Framework_TestCase
+class MundoTests extends PHPUnit_Framework_TestCase
 {
 
 	/**
 	 * Ensures the factory method assigns the variables passed and returns a
-	 * MetaMongo instance.
+	 * Mundo instance.
 	 *
 	 *
-	 * @covers MetaMongo::factory
-	 * @covers MetaMongo_Object::__construct
+	 * @covers Mundo::factory
+	 * @covers Mundo_Object::__construct
 	 */
 	public function test_factory_returns_instance_with_values()
 	{
@@ -36,7 +36,7 @@ class MetaMongoTests extends PHPUnit_Framework_TestCase
 			)
 		);
 
-		$object = MetaMongo::factory('blogpost', $values);
+		$object = Mundo::factory('blogpost', $values);
 
 		$this->assertSame($object->get(), $values);
 	}
@@ -45,11 +45,11 @@ class MetaMongoTests extends PHPUnit_Framework_TestCase
 	 * Ensures that an error is thrown when the second factory parameter is not
 	 * an array.
 	 *
-	 * @expectedException MetaMongo_Exception
+	 * @expectedException Mundo_Exception
 	 */
 	public function test_factory_throws_error_when_assigning_non_array()
 	{
-		$object = MetaMongo::factory('blogpost', 'error');
+		$object = Mundo::factory('blogpost', 'error');
 	}
 
 	/**
@@ -59,8 +59,8 @@ class MetaMongoTests extends PHPUnit_Framework_TestCase
 	 */
 	public function test_flatten_returns_empty_array_when_passed_non_array()
 	{
-		$this->assertEquals(MetaMongo::flatten('test'), array());
-		$this->assertEmpty(MetaMongo::flatten('test'));
+		$this->assertEquals(Mundo::flatten('test'), array());
+		$this->assertEmpty(Mundo::flatten('test'));
 	}
 
 	/**
@@ -158,15 +158,15 @@ class MetaMongoTests extends PHPUnit_Framework_TestCase
 	/**
 	 * Ensures the flatten() method works as expected
 	 *
-	 * @covers MetaMongo_Core::flatten
-	 * @covers MetaMongo_Core::_flatten
+	 * @covers Mundo_Core::flatten
+	 * @covers Mundo_Core::_flatten
 	 * @dataProvider provider_flatten
 	 * @param  array  $argument  Array to pass to flatten
 	 * @param  array  $expected  Expected return from flatten
 	 */
 	public function test_flatten_method($argument, $expected)
 	{
-		$this->assertEquals(MetaMongo::flatten($argument), $expected);
+		$this->assertEquals(Mundo::flatten($argument), $expected);
 	}
 
 	/**
@@ -203,7 +203,7 @@ class MetaMongoTests extends PHPUnit_Framework_TestCase
 	/**
 	 * Ensure the instance_of() method returns the correct results
 	 *
-	 * @covers MetaMongo_Core::instance_of
+	 * @covers Mundo_Core::instance_of
 	 * @dataProvider provider_instance_of
 	 * @param string $object 
 	 * @param string $instance_name 
@@ -213,6 +213,6 @@ class MetaMongoTests extends PHPUnit_Framework_TestCase
 	 */
 	public function test_instance_of($object, $instance_name, $expected_result)
 	{
-		$this->assertEquals(MetaMongo::instance_of($object, $instance_name), $expected_result);
+		$this->assertEquals(Mundo::instance_of($object, $instance_name), $expected_result);
 	}
 }

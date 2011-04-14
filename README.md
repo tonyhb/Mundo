@@ -1,8 +1,8 @@
-## MetaMongo
+## Mundo
 
-MetaMongo is (will be) a mapping system written for the MongoDB Database and the [Kohana Framework](http://kohanaframework.org/).
+Mundo is (will be) a mapping system written for the MongoDB Database and the [Kohana Framework](http://kohanaframework.org/).
 
-So, I'm currently developing this and it's _not even in alpha!_ Hopefully, by the first release, MetaMongo should do the following:
+So, I'm currently developing this and it's _not even in alpha!_ Hopefully, by the first release, Mundo should do the following:
 
 * Validate model data (including embedded objects and collections)
 * Provide an object for the model's state and data

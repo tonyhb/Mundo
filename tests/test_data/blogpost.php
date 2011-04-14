@@ -1,20 +1,20 @@
 <?php defined('SYSPATH') or die('No direct script access.');
 
 /**
- * Example MetaMongo model used for our tests
+ * Example Mundo model used for our tests
  *
- * @package MetaMongo
+ * @package Mundo
  * @category Tests
  * @author Tony Holdstock-Brown
  **/
-class Model_Blogpost extends MetaMongo_Object
+class Model_Blogpost extends Mundo_Object
 {
 
 	/**
 	 * This is the name of the collection we're saving to in MongoDB.
 	 *
 	 * !! Note: This string becomes a MongoCollection instance once _init_db()
-	 *          has been called (see MetaMongo_Core for this method).
+	 *          has been called (see Mundo_Core for this method).
 	 *
 	 * @var string
 	 */
@@ -45,14 +45,14 @@ class Model_Blogpost extends MetaMongo_Object
 			'description',
 		),
 		'comments' => array(
-			// The following '$' character as an array key tells MetaMongo we can have many of the following objects.
+			// The following '$' character as an array key tells Mundo we can have many of the following objects.
 			'$' => array(
 				'comment',
 				'author_name',
 				'author_url',
 				'author_email',
 				'likes' => array(
-					'$', // A single '$' character as a value (NOT a key) tells MetaMongo that we can have a flat array of any length (in this case the name of people that 'liked' the comment.)
+					'$', // A single '$' character as a value (NOT a key) tells Mundo that we can have a flat array of any length (in this case the name of people that 'liked' the comment.)
 				),
 			),
 		),
@@ -79,11 +79,11 @@ class Model_Blogpost extends MetaMongo_Object
 			array('not_empty'),
 		),
 		'post_date' => array(
-			array('MetaMongo::instance_of', array(':value', 'MongoDate')), // MetaMongo comes with an instanceof static method to ensure we insert correct Mongo classes.
+			array('Mundo::instance_of', array(':value', 'MongoDate')), // Mundo comes with an instanceof static method to ensure we insert correct Mongo classes.
 			array('not_empty'),
 		),
 		'author' => array(
-			array('MetaMongo::instance_of', array(':value', 'MongoId')),
+			array('Mundo::instance_of', array(':value', 'MongoId')),
 			array('not_empty'),
 		),
 		'author_name' => array(
@@ -138,7 +138,7 @@ class Model_Blogpost extends MetaMongo_Object
 			array('inflector::underscore'), // Ensure there's no spaces in our slug
 		),
 		'post_date' => array(
-			array('MetaMongo::date') // Convert our date to a MongoDate object using MetaMongo's static date method
+			array('Mundo::date') // Convert our date to a MongoDate object using Mundo's static date method
 		),
 	);
 
