@@ -811,6 +811,58 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	}
 
 	/**
+	 * This ensures that getting data which has a mixture of original and 
+	 * changed data returns the correct merge of the two.
+	 *
+	 * @test
+	 * @covers Mundo_Object::get
+	 * @covers Mundo_Object::_merge
+	 * @dataProvider provider_validate_and_create_data
+	 * @return void
+	 * @author Tony Holdstock-Brown
+	 */
+	public function test_using_get_with_loaded_and_changed_data_merges($data, $validation_status, $expcted_validation_errors = NULL)
+	{
+		// If the data hasn't been validated it won't have been saved, so skip this test
+		if ( ! $validation_status)
+			return;
+
+		$document = new Model_Blogpost;
+		$document->set($data)->load();
+
+		if ( ! $document->loaded())
+		{
+			$this->fail("A document has not been loaded");
+		}
+
+		if (count($document->changed()) > 0)
+		{
+			$this->fail('A document has been loaded but the $_changed variable has not been emptied');
+		}
+
+		// Get our loaded data
+		$data = $document->get();
+
+		// Our new data
+		$new_data = array(
+			'post_title' => 'New post title',
+			'post_slug'  => 'New post slug',
+			'post_metadata.keywords' => 'New post keywords',
+		);
+		$document->set($new_data);
+
+		$this->assertEquals(Mundo::flatten($document->changed()), $new_data);
+
+		// Get the $data and $new_data merge for comparison
+		$data = Mundo::flatten($data);
+		$data = array_merge($data, $new_data);
+		$data = Mundo::inflate($data);
+
+		// Ensure merging works fine
+		$this->assertSame($document->get(), $data);
+	}
+
+	/**
 	 * Tests how the load() method handles loading with no data
 	 *
 	 * @covers Mundo_Object::load
@@ -876,11 +928,78 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 							'likes'        => array('Joe Bloggs', 'Ted Smith'),
 						),
 					),
-				)
+				),
 				// Expected query: TODO
 				TRUE,
 				NULL
 			),
-		)
+		);
 	}
+
+	
+	/**
+	 * Ensures that running the update method on an object that hasn't been
+	 * loaded from the database fails
+	 *
+	 * @test
+	 * @covers Mundo_Object::update
+	 * @expectedException Mundo_Exception
+	 * @expectedExceptionMessage Cannot update the document because the model has not yet been loaded
+	 * @return void
+	 */
+	public function test_updating_unloaded_object_fails()
+	{
+		$document = new Model_Blogpost;
+
+		$document->set('post_title', 'This is the post title');
+
+		$document->update();
+	}
+
+	/**
+	 * Ensures that the document's representation in the database is updated
+	 * correctly and that the update function uses the most appropriate
+	 * atomic operations to update the data
+	 *
+	 * @test
+	 * @covers Mundo_Object::update
+	 * @covers Mundo_Object::last_query
+	 * @dataProvider provider_update
+	 * @return void
+	 */
+	public function test_updating_document_with_valid_data($data, $changed_data, $expected_query)
+	{
+		$document = new Model_Blogpost;
+
+		// Set our data and load the correct document from the database
+		$document->set($data)->load();
+
+		// Basic sanity checking without asserts
+		if ( ! $document->loaded())
+		{
+			$this->fail("A document could not be loaded");
+		}
+		if ( ! empty($document->changed()))
+		{
+			$this->fail("The document was loaded but the _changed variable not emptied");
+		}
+
+		// Merge our data
+		$merged_data = array_merge(Mundo::flatten($data), Mundo::flatten($changed_data));
+		$merged_data = Mundo::inflate($merged_data);
+
+		// Update our values in the model
+		$document->set($changed_data)->update();
+
+		// Ensure our data has been saved successfully
+		$this->assertEquals($document->original(), $merged_data);
+		$this->assertEmpty($document->changed());
+
+		// Ensure that we used correct atomic operations, baby
+		$this->assertEquals($document->last_query(), $expected_query);
+	}
+
+	/**
+	 * @todo Test updating with invalid data
+	 **/
 }
