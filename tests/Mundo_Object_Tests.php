@@ -20,7 +20,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		// Remove our testing database before writing tests.
         $mongo = new Mongo;
 
-		$config = Kohana::config('Mundo');
+		$config = Kohana::$config->load("mundo");
 
 		// Select our database
 		$db = $mongo->{$config->database};
@@ -979,7 +979,9 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		{
 			$this->fail("A document could not be loaded");
 		}
-		if ( ! empty($document->changed()))
+
+		$changed = $document->changed();
+		if ( ! empty($changed))
 		{
 			$this->fail("The document was loaded but the _changed variable not emptied");
 		}
