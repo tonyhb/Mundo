@@ -9,7 +9,8 @@
 	> 
 
 	<php>
-		<server name="HTTP_HOST" value="Mundo.local"/>
+		<server name="HTTP_HOST" value="Mundo.local" />
+		<server name="KOHANA_ENV" value="TESTING" />
 	</php>
 
 	<testsuites> 
