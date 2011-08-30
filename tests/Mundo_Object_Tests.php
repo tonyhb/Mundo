@@ -18,7 +18,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	public static function setUpBeforeClass()
 	{
 		// Remove our testing database before writing tests.
-        $mongo = new Mongo;
+		$mongo = new Mongo;
 
 		$config = Kohana::$config->load("mundo");
 
@@ -674,6 +674,8 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @covers Mundo_Object::original
 	 * @covers Mundo_Object::_init_db
 	 * @covers Mundo_Object::load
+	 * @covers Mundo_Object::validate
+	 * @covers Mundo_Object::_validate
 	 * @dataProvider provider_validate_and_create_data
 	 *
 	 * @param  array   $data   Data to add to the DB
@@ -749,6 +751,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 			{
 				// Ensure an ObjectId hasn't been added to our data
 				$this->assertSame($data, $document->get());
+				$this->assertSame($data, $document->changed());
 
 				// Assert we're not loaded
 				$this->assertFalse($document->loaded());
@@ -936,38 +939,17 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		);
 	}
 
-	
 	/**
-	 * Ensures that running the update method on an object that hasn't been
-	 * loaded from the database fails
+	 * Ensures that the document's representation in the database is saved
+	 * correctly. The save() method is essentially a duplicate of the 
+	 * driver's method: this does not use atomic operations.
 	 *
 	 * @test
-	 * @covers Mundo_Object::update
-	 * @expectedException Mundo_Exception
-	 * @expectedExceptionMessage Cannot update the document because the model has not yet been loaded
-	 * @return void
-	 */
-	public function test_updating_unloaded_object_fails()
-	{
-		$document = new Model_Blogpost;
-
-		$document->set('post_title', 'This is the post title');
-
-		$document->update();
-	}
-
-	/**
-	 * Ensures that the document's representation in the database is updated
-	 * correctly and that the update function uses the most appropriate
-	 * atomic operations to update the data
-	 *
-	 * @test
-	 * @covers Mundo_Object::update
-	 * @covers Mundo_Object::last_query
+	 * @covers Mundo_Object::save
 	 * @dataProvider provider_update
 	 * @return void
 	 */
-	public function test_updating_document_with_valid_data($data, $changed_data, $expected_query)
+	public function test_save_document_with_valid_and_previously_inserted_data($data, $changed_data, $expected_query)
 	{
 		$document = new Model_Blogpost;
 
@@ -986,22 +968,131 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 			$this->fail("The document was loaded but the _changed variable not emptied");
 		}
 
-		// Merge our data
+		// Merge our data for the assertions
 		$merged_data = array_merge(Mundo::flatten($data), Mundo::flatten($changed_data));
 		$merged_data = Mundo::inflate($merged_data);
 
+		// And as this data had already been inserted by a previous test, we need to add the ID
+		$merged_data += array('_id' => $document->get('_id'));
+
 		// Update our values in the model
-		$document->set($changed_data)->update();
+		$document->set($changed_data)->save();
 
-		// Ensure our data has been saved successfully
+		// Original data will be $merged from above
 		$this->assertEquals($document->original(), $merged_data);
-		$this->assertEmpty($document->changed());
 
-		// Ensure that we used correct atomic operations, baby
-		$this->assertEquals($document->last_query(), $expected_query);
+		// And changed should have been emptied.
+		$this->assertEmpty($document->changed());
 	}
 
 	/**
-	 * @todo Test updating with invalid data
-	 **/
+	 * @Todo Test saving with no changed data does nothing
+	 */
+
+	/**
+	 * Test saving data  with invalid data throws a validation exception
+	 * instead of saving.
+	 *
+	 * @test
+	 * @covers Mundo_Object::save
+	 * @dataProvider provider_validate_and_create_data
+	 *
+	 * @param   array  $data             array of model data to set
+	 * @param   bool   $check_result     Whether the validation check() method should return true or false
+	 * @param   array  $expected_errors  Array of expected error messages from the errors() method
+	 * @return void
+	 */
+	public function test_saving_invalid_data_throws_exception($data, $validation_status, $expected_validation_errors = NULL)
+	{
+		// Set our data.
+		$document = new Model_Blogpost($data);
+
+		if ( ! $validation_status)
+		{
+			try
+			{
+				// Attempt to create
+				$document->save();
+			}
+			catch(Validation_Exception $e)
+			{
+				// Ensure an ObjectId hasn't been added to our data
+				$this->assertSame($data, $document->get());
+				$this->assertSame($data, $document->changed());
+
+				// Assert we're not loaded
+				$this->assertFalse($document->loaded());
+
+				// Ensure that we failed for the expected reasons
+				$this->assertSame($e->array->errors(TRUE), $expected_validation_errors);
+
+				return;
+			}
+
+			$this->fail("Data should have failed validation but an exception was not raised");
+
+		}
+	}
+
+	/**
+	 * Test saving an unloaded model or model without an _id results in 
+	 * saving using an upsert.
+	 *
+	 * @test
+	 * @covers Mundo_Object::save
+	 * @dataProvider provider_validate_and_create_data
+	 *
+	 * @param   array  $data             array of model data to set
+	 * @param   bool   $check_result     Whether the validation check() method should return true or false
+	 * @param   array  $expected_errors  Array of expected error messages from the errors() method
+	 * @return void
+	 */
+	public function test_saving_unloaded_document_results_in_upsert($data, $validation_status, $expected_validation_errors = NULL)
+	{
+		// Set our data.
+		$document = new Model_Blogpost($data);
+
+		if ($validation_status)
+		{
+			$document->save();
+
+			// Ensure an ObjectId has been added to our data, which indicates the save
+			$this->assertInstanceOf('MongoId', $document->get('_id'));
+
+			// Ensure we are now loaded
+			$this->assertTrue($document->loaded());
+
+			// Save our new data with the ObjectId
+			$saved_data = $document->get();
+
+			// Ensure that all data has been moved into the $_data variable
+			$this->assertEquals($saved_data, $document->original());
+
+			// Ensure we have no changed data
+			$this->assertempty($document->changed());
+
+			// Test reloading our saved object
+			$this->assertEquals($document->load()->get(), $saved_data);
+
+			// Test loading from our ID
+			$loaded_object = new Model_Blogpost;
+			$loaded_object->set('_id', $document->original('_id'));
+			$loaded_object->load();
+
+			$this->assertEquals($loaded_object->get(), $document->original());
+		}
+	}
+
+	/**
+	 * @todo Test atomic operations with update()
+	 */
+
+	/**
+	 * @todo Test atomic operations with update() on an unloaded model fail
+	 */
+
+	/**
+	 * @todo Test atomic operations using a query passed as an argument
+	 *       on loaded and unloaded models (maybe?)
+	 */
 }

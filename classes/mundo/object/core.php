@@ -382,6 +382,25 @@ class Mundo_Object_Core
 	}
 
 	/**
+	 * Helper function used to validate current data when querying database
+	 *
+	 * @throws Validation_Exception
+	 * @return boolean
+	 */
+	protected function _validate()
+	{
+
+		$validate = $this->validate();
+
+		if ( ! $validate->check())
+		{
+			throw new Validation_Exception($validate);
+			return FALSE;
+		}
+
+		return TRUE;
+	}
+	/**
 	 * This extracts rules form $_rules in the format required for the
 	 * Validation library
 	 *
@@ -501,12 +520,8 @@ class Mundo_Object_Core
 			unset($object, $class);
 		}
 
-		$validate = $this->validate();
-
-		if ( ! $validate->check())
-		{
-			throw new Validation_Exception($validate);
-		}
+		// Ensure our data is valid
+		$this->_validate();
 
 		// Intiialise our database
 		$this->_init_db();
@@ -530,6 +545,39 @@ class Mundo_Object_Core
 	}
 
 	/**
+	 * Saves model data using the MongoCollection::save driver method
+	 *
+	 * @return $this
+	 **/
+	public function save()
+	{
+		// Validate our data
+		$this->_validate();
+
+		// If we have no changed data why bother?
+		if ( ! $this->changed())
+			return $this;
+
+		// Merge old and new data together.
+		$data = $this->_merge();
+
+		// Connect to and query the collection
+		$this->_init_db();
+		$this->_collection->save($data, array('safe' => $this->_safe));
+
+		// Reset our changed array
+		$this->_changed = array();
+
+		// Replace our data just in case an upsert created an ID
+		$this->_data = $data;
+
+		// Ensure we're loaded if that was an upsert
+		$this->_loaded = TRUE;
+
+		return $this;
+	}
+
+	/**
 	 * Connect to Mongo for queries
 	 *
 	 * @return self 
@@ -544,7 +592,7 @@ class Mundo_Object_Core
 		}
 
 		// Get our configuration information
-		$config = Kohana::config('Mundo');
+		$config = Kohana::$config->load("mundo");
 
 		// Load and connect to mongo
 		$this->_mongo = new Mongo();
@@ -571,6 +619,12 @@ class Mundo_Object_Core
 	public function load($object_id = NULL)
 	{
 		$query = array();
+
+		/**
+		 * @todo Assess the below: should we just attempt to check for
+		 * an object_id argument, use the current $_id from merged and
+		 * then use all data instead of this?
+		 */
 
 		if ($object_id)
 		{
