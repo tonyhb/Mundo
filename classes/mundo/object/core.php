@@ -578,6 +578,58 @@ class Mundo_Object_Core
 	}
 
 	/**
+	 * Atomically updates the document according to data in the changed
+	 * property.
+	 *
+	 * @returns $this
+	 */
+	public function update()
+	{
+		// If this isn't loaded fail
+		if ( ! $this->loaded())
+		{
+			throw new Mundo_Exception("Cannot atomically update the document because the model has not yet been loaded");
+		}
+
+		// Do no work if possible.
+		if ( ! $this->changed())
+			return $this;
+
+		// Initialise an empty driver query
+		$query = array();
+
+		// Take our changed and original and flatten them for comparison
+		$changed = Mundo::flatten($this->changed());
+		$original = Mundo::flatten($this->original());
+
+		echo Debug::vars($changed, $original);
+
+		foreach ($changed as $field => $value)
+		{
+		}
+	}
+
+
+	/**
+	 * Stores an array containing the last update() query sent to the driver
+	 * Mongo PHP driver
+	 *
+	 * @var array
+	 **/
+	protected $_last_update;
+
+	/**
+	 * Displays the last atomic operation as it would have been sent to the
+	 * Mongo PHP driver
+	 *
+	 * @return array
+	 */
+	public function last_update()
+	{
+		return $this->_last_update;
+	}
+
+	/**
 	 * Connect to Mongo for queries
 	 *
 	 * @return self 
