@@ -118,8 +118,23 @@ class Mundo_Object_Core
 		if ( ! $values)
 			return $this;
 
-		// Call our set function
-		$this->_set($values);
+		// Flatten our set data
+		$values = Mundo::flatten($values);
+
+		foreach ($values as $field => $value)
+		{
+			// Replace numerical keys with mongo's positional operator
+			$field_positional = preg_replace('#\.[0-9]+#', '.$', $field);
+
+			// $field_positional needs to be the whole array path or at least the first portion
+			if ( ! in_array($field_positional, $this->_fields) AND ! preg_grep('/^'.str_replace(array('$', '.'), array('\$', '\.'), $field_positional).'/', $this->_fields))
+			{
+				throw new Mundo_Exception("Field ':field' does not exist", array(':field' => $field));
+			}
+
+			// Set our data
+			Arr::set_path($this->_changed, $field, $value);
+		}
 
 		return $this;
 	}
@@ -135,65 +150,6 @@ class Mundo_Object_Core
 	 */
 	protected function _set($values, $parent_path = NULL)
 	{
-		foreach ($values as $field => $value)
-		{
-			if (strpos($field, '.') !== FALSE)
-			{
-				// We're using dot notation to set an embedded object, so separate our path string.
-				$paths = explode('.', $field);
-
-				// Pop the field name we are setting (the last element)
-				$field = array_pop($paths);
-
-				// Take the remaining keys as our parent path and array path
-				$parent_path = implode('.', $paths);
-			}
-
-			// Set our working path as either the field name or the path to our field.
-			$path = ($parent_path) ? $parent_path.'.'.$field : $field;
-
-			if (is_array($value))
-			{
-				// Call set on the embedded object
-				$this->_set($value, $path);
-			}
-			else
-			{
-				if ($parent_path)
-				{
-					// Exchange numerical paths for the '$' indicator.
-					if ($object = Arr::path($this->_fields, preg_replace('#\.[0-9]+#', '.$', $parent_path)))
-					{
-						// Check to see that the field exists || we have an array that allows any kind of data || we are unsetting an embedded object
-						$field_exists = in_array($field, $object) || $object[0] == '$' || (array_key_exists($field, $object) AND $value === NULL);
-					}
-					else
-					{
-						// We could not get an object for the parent path, assume the field doesn't exist. 
-						// This should never happen, hence the code coverage tags. If it does, send me an email =D
-
-						// @codeCoverageIgnoreStart
-						$field_exists = FALSE;
-						// @codeCoverageIgnoreEnd
-					}
-				}
-				else
-				{
-					// CHeck to see if the value exists in the first array dimension, or if the array key exists for setting as embedded objects as null
-					$field_exists = in_array($field, $this->_fields) || (array_key_exists($field, $this->_fields) AND $value === NULL);
-				}
-
-				if ( ! $field_exists)
-				{
-					// Add the path to the field name to show where the error occurred
-					$field = ($parent_path) ? $parent_path.'.'.$field : $field;
-					throw new Mundo_Exception("Field ':field' does not exist", array(':field' => $field));
-				}
-
-				// Set our data
-				Arr::set_path($this->_changed, $path, $value);
-			}
-		}
 	}
 
 	/**
