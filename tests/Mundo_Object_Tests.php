@@ -18,9 +18,9 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	public static function setUpBeforeClass()
 	{
 		// Remove our testing database before writing tests.
-        $mongo = new Mongo;
+		$mongo = new Mongo;
 
-		$config = Kohana::config('Mundo');
+		$config = Kohana::$config->load("mundo");
 
 		// Select our database
 		$db = $mongo->{$config->database};
@@ -174,6 +174,24 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 				// Mundo should throw an error saying our field doesn't exist
 				"Field 'comments.0.embedded' does not exist", 
 			),
+			// Dot notation within normal keys
+			array(
+				array(
+					'post_title' => 'Example blog post',
+					'post_metadata.keywords' => 'keyword, another',
+					'post_metadata.description' => 'This is a post description keyword tag',
+					'author_name' => 'Author name',
+				),
+				NULL,
+				array(
+					'post_title' => 'Example blog post',
+					'post_metadata' => array(
+						'keywords' => 'keyword, another',
+						'description' => 'This is a post description keyword tag'
+					),
+					'author_name' => 'Author name'
+				)
+			)
 		);
 	}
 
@@ -674,6 +692,8 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @covers Mundo_Object::original
 	 * @covers Mundo_Object::_init_db
 	 * @covers Mundo_Object::load
+	 * @covers Mundo_Object::validate
+	 * @covers Mundo_Object::_validate
 	 * @dataProvider provider_validate_and_create_data
 	 *
 	 * @param  array   $data   Data to add to the DB
@@ -749,6 +769,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 			{
 				// Ensure an ObjectId hasn't been added to our data
 				$this->assertSame($data, $document->get());
+				$this->assertSame($data, $document->changed());
 
 				// Assert we're not loaded
 				$this->assertFalse($document->loaded());
@@ -811,6 +832,58 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	}
 
 	/**
+	 * This ensures that getting data which has a mixture of original and 
+	 * changed data returns the correct merge of the two.
+	 *
+	 * @test
+	 * @covers Mundo_Object::get
+	 * @covers Mundo_Object::_merge
+	 * @dataProvider provider_validate_and_create_data
+	 * @return void
+	 * @author Tony Holdstock-Brown
+	 */
+	public function test_using_get_with_loaded_and_changed_data_merges($data, $validation_status, $expcted_validation_errors = NULL)
+	{
+		// If the data hasn't been validated it won't have been saved, so skip this test
+		if ( ! $validation_status)
+			return;
+
+		$document = new Model_Blogpost;
+		$document->set($data)->load();
+
+		if ( ! $document->loaded())
+		{
+			$this->fail("A document has not been loaded");
+		}
+
+		if (count($document->changed()) > 0)
+		{
+			$this->fail('A document has been loaded but the $_changed variable has not been emptied');
+		}
+
+		// Get our loaded data
+		$data = $document->get();
+
+		// Our new data
+		$new_data = array(
+			'post_title' => 'New post title',
+			'post_slug'  => 'New post slug',
+			'post_metadata.keywords' => 'New post keywords',
+		);
+		$document->set($new_data);
+
+		$this->assertEquals(Mundo::flatten($document->changed()), $new_data);
+
+		// Get the $data and $new_data merge for comparison
+		$data = Mundo::flatten($data);
+		$data = array_merge($data, $new_data);
+		$data = Mundo::inflate($data);
+
+		// Ensure merging works fine
+		$this->assertSame($document->get(), $data);
+	}
+
+	/**
 	 * Tests how the load() method handles loading with no data
 	 *
 	 * @covers Mundo_Object::load
@@ -823,4 +896,305 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		$document = new Model_Blogpost;
 		$document->load();
 	}
+
+	/**
+	 * Provider for the save and update methods
+	 */
+	public function provider_update()
+	{
+		return array(
+			array(
+				// Complete data to load, copied from provider_validate_and_create_data
+				array(
+					'post_title'    => 'Example blog post',
+					'post_slug'     => 'example-blog-post',
+					'post_date'     => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
+					'author'        => new MongoId('4d965966ef966f0916000000'),
+					'author_name'   => 'Author Jones',
+					'author_email'  => 'author@example.com',
+					'post_excerpt'  => '...An excerpt from the post. Boom!',
+					'post_content'  => 'This is the whole post. And this should be an excerpt from the bost. Boom! // End of blog post 1.',
+					'post_metadata' => array(
+						'keywords'    => 'mongodb, mongo, php, php mongo orm, php mongodb orm, sexiness',
+						'description' => 'An example description tag for a blog post. Google SERP me plox!',
+					),
+					'comments'      => array(
+						array(
+							'comment'      => 'Comment number 1',
+							'author_name'  => 'Commenter Smith',
+							'author_url'   => 'http://example-commenter.com/',
+							'author_email' => 'commenter.smith@example.com',
+							'likes'        => array('Joe Bloggs', 'Ted Smith'),
+						),
+						array(
+							'comment'      => 'Comment number 2',
+							'author_name'  => 'Commenter Brown',
+							'author_email' => 'commenter.brown@example.com',
+						),
+					),
+				),
+				// What we're changing data to
+				array(
+					'post_title'    => 'New post title',
+					'post_date'     => new MongoDate(strtotime("26th March 2011, 11:24AM")),
+					'post_metadata' => array(
+						'keywords' => 'new keywords, updated object',
+					),
+					// mimic __unset
+					'post_excerpt'  => NULL,
+					// Remove one embedded object
+					'comments'      => array(
+						array(
+							'comment'      => 'Comment number 1',
+							'author_name'  => 'Dr. Smith',
+							'author_url'   => 'http://example-commenter.com/',
+							'author_email' => 'my.new.email@example.com',
+							'likes'        => array('Joe Bloggs', 'Ted Smith'),
+						),
+					),
+				),
+				// Expected query
+				array(
+					'$set' => array(
+						'post_title' => 'New post title',
+						'post_date' => new MongoDate(strtotime("26th March 2011, 11:24AM")),
+						'post_metadata.keywords' => 'new keywords, updated object',
+						'comment.1.author_name' => 'Dr. Smith',
+						'comment.1.author_email' => 'my.new.email@example.com',
+						'comment.1.likes' => array('Joe Bloggs', 'Ted Smith')
+					),
+					'$unset' => array('post_excerpt'),
+				)
+			),
+		);
+	}
+
+	/**
+	 * Ensures that the document's representation in the database is saved
+	 * correctly. The save() method is essentially a duplicate of the 
+	 * driver's method: this does not use atomic operations.
+	 *
+	 * @test
+	 * @covers Mundo_Object::save
+	 * @dataProvider provider_update
+	 * @return void
+	 */
+	public function test_save_document_with_valid_and_previously_inserted_data($data, $changed_data, $expected_query)
+	{
+		$document = new Model_Blogpost;
+
+		// Set our data and load the correct document from the database
+		$document->set($data)->load();
+
+		// Basic sanity checking without asserts
+		if ( ! $document->loaded())
+		{
+			$this->fail("A document could not be loaded");
+		}
+
+		$changed = $document->changed();
+		if ( ! empty($changed))
+		{
+			$this->fail("The document was loaded but the _changed variable not emptied");
+		}
+
+		// Merge our data for the assertions
+		$merged_data = array_merge(Mundo::flatten($data), Mundo::flatten($changed_data));
+		$merged_data = Mundo::inflate($merged_data);
+
+		// And as this data had already been inserted by a previous test, we need to add the ID
+		$merged_data += array('_id' => $document->get('_id'));
+
+		// Update our values in the model
+		$document->set($changed_data)->save();
+
+		// Original data will be $merged from above
+		$this->assertEquals($document->original(), $merged_data);
+
+		// And changed should have been emptied.
+		$this->assertEmpty($document->changed());
+	}
+
+	/**
+	 * @Todo Test saving with no changed data does nothing
+	 */
+
+	/**
+	 * Test saving data  with invalid data throws a validation exception
+	 * instead of saving.
+	 *
+	 * @test
+	 * @covers Mundo_Object::save
+	 * @dataProvider provider_validate_and_create_data
+	 *
+	 * @param   array  $data             array of model data to set
+	 * @param   bool   $check_result     Whether the validation check() method should return true or false
+	 * @param   array  $expected_errors  Array of expected error messages from the errors() method
+	 * @return void
+	 */
+	public function test_saving_invalid_data_throws_exception($data, $validation_status, $expected_validation_errors = NULL)
+	{
+		// Set our data.
+		$document = new Model_Blogpost($data);
+
+		if ( ! $validation_status)
+		{
+			try
+			{
+				// Attempt to create
+				$document->save();
+			}
+			catch(Validation_Exception $e)
+			{
+				// Ensure an ObjectId hasn't been added to our data
+				$this->assertSame($data, $document->get());
+				$this->assertSame($data, $document->changed());
+
+				// Assert we're not loaded
+				$this->assertFalse($document->loaded());
+
+				// Ensure that we failed for the expected reasons
+				$this->assertSame($e->array->errors(TRUE), $expected_validation_errors);
+
+				return;
+			}
+
+			$this->fail("Data should have failed validation but an exception was not raised");
+
+		}
+	}
+
+	/**
+	 * Test saving an unloaded model or model without an _id results in 
+	 * saving using an upsert.
+	 *
+	 * @test
+	 * @covers Mundo_Object::save
+	 * @dataProvider provider_validate_and_create_data
+	 *
+	 * @param   array  $data             array of model data to set
+	 * @param   bool   $check_result     Whether the validation check() method should return true or false
+	 * @param   array  $expected_errors  Array of expected error messages from the errors() method
+	 * @return void
+	 */
+	public function test_saving_unloaded_document_results_in_upsert($data, $validation_status, $expected_validation_errors = NULL)
+	{
+		// Set our data.
+		$document = new Model_Blogpost($data);
+
+		if ($validation_status)
+		{
+			$document->save();
+
+			// Ensure an ObjectId has been added to our data, which indicates the save
+			$this->assertInstanceOf('MongoId', $document->get('_id'));
+
+			// Ensure we are now loaded
+			$this->assertTrue($document->loaded());
+
+			// Save our new data with the ObjectId
+			$saved_data = $document->get();
+
+			// Ensure that all data has been moved into the $_data variable
+			$this->assertEquals($saved_data, $document->original());
+
+			// Ensure we have no changed data
+			$this->assertempty($document->changed());
+
+			// Test reloading our saved object
+			$this->assertEquals($document->load()->get(), $saved_data);
+
+			// Test loading from our ID
+			$loaded_object = new Model_Blogpost;
+			$loaded_object->set('_id', $document->original('_id'));
+			$loaded_object->load();
+
+			$this->assertEquals($loaded_object->get(), $document->original());
+		}
+	}
+
+	/**
+	 * Test that the update function creates the correct atomic operation
+	 * queries for updating data
+	 *
+	 * @test
+	 * @covers Mundo_Object::update
+	 * @dataProvider provider_update
+	 *
+	 * @param  array  array of model data to set and load
+	 * @param  array  array of model data to change
+	 * @param  array  expected atomic operation query
+	 * @return void
+	 */
+	public function test_update_updates_atomically($data, $changed_data, $expected_atomic_operation)
+	{
+		$document = new Model_Blogpost($data);
+
+		// Update requires a loaded document.
+		$document->load();
+
+		// Sanity check
+		if ( ! $document->loaded())
+		{
+			$this->fail("A document could not be loaded");
+		}
+
+		// Replace our $data variable with the full document in the DB (add the _id field)
+		$data = $document->get();
+
+		// Change our data
+		$document->set($changed_data);
+
+		$document->update();
+
+		// Merge our data to compare the new representation with what it should be
+		$merged_data = array_merge(Mundo::flatten($data), Mundo::flatten($changed_data));
+		$merged_data = Mundo::inflate($merged_data);
+
+		// Test that the update was as atomic as we expected
+		$this->assertEquals($document->last_update(), $expected_atomic_operation);
+
+		// Test that the data is now saved
+		$this->assertEquals($document->get(), $merged_data);
+
+		// Test that changed is now empty
+		$this->assertEmpty($document->changed());
+
+		// Sanity check: reload the model in a new object and compare data to ensure it went to the database A-OK
+		$reloaded_document = new Model_Blogpost();
+		$reloaded_document->set('_id', $document->get('_id'))->load();
+
+		// If the query was successful these should be the same
+		$this->assertEquals($document->get(), $reloaded_document->get());
+	}
+
+
+	/**
+	 * @todo Test update() fails with invalid data
+	 */
+
+	/**
+	 * Ensures that running the update method on an object that hasn't been
+	 * loaded from the database fails
+	 *
+	 * @test
+	 * @covers Mundo_Object::update
+	 * @expectedException Mundo_Exception
+	 * @expectedExceptionMessage Cannot atomically update the document because the model has not yet been loaded
+	 *
+	 * @return void
+	 */
+	public function test_updating_unloaded_object_fails()
+	{
+		$document = new Model_Blogpost;
+
+		$document->set('post_title', 'This is the post title');
+
+		$document->update();
+	}
+            
+	/** 
+	 * @todo Test atomic operations using a query passed as an argument
+	 *       on loaded and unloaded models (maybe?)
+	 */
 }

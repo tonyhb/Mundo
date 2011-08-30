@@ -64,7 +64,7 @@ class MundoTests extends PHPUnit_Framework_TestCase
 	}
 
 	/**
-	 * Provider for test_flatten_method() 
+	 * Provider for test_flatten_and_inflate_method() 
 	 *
 	 */
 	public static function provider_flatten()
@@ -156,17 +156,23 @@ class MundoTests extends PHPUnit_Framework_TestCase
 	}
 
 	/**
-	 * Ensures the flatten() method works as expected
+	 * Ensures the flatten() and inflate() methods works as expected
 	 *
 	 * @covers Mundo_Core::flatten
 	 * @covers Mundo_Core::_flatten
+	 * @covers Mundo_Core::inflate
 	 * @dataProvider provider_flatten
 	 * @param  array  $argument  Array to pass to flatten
 	 * @param  array  $expected  Expected return from flatten
 	 */
-	public function test_flatten_method($argument, $expected)
+	public function test_flatten_and_inflate_method($argument, $expected)
 	{
-		$this->assertEquals(Mundo::flatten($argument), $expected);
+		$flattened = Mundo::flatten($argument);
+
+		$inflated = Mundo::inflate($flattened);
+
+		$this->assertEquals($flattened, $expected);
+		$this->assertEquals($inflated, $argument);
 	}
 
 	/**
