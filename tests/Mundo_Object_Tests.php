@@ -879,6 +879,9 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		$document->load();
 	}
 
+	/**
+	 * Provider for the save and update methods
+	 */
 	public function provider_update()
 	{
 		return array(
@@ -925,16 +928,25 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 					'comments'      => array(
 						array(
 							'comment'      => 'Comment number 1',
-							'author_name'  => 'Commenter Smith',
+							'author_name'  => 'Dr. Smith',
 							'author_url'   => 'http://example-commenter.com/',
-							'author_email' => 'commenter.smith@example.com',
+							'author_email' => 'my.new.email@example.com',
 							'likes'        => array('Joe Bloggs', 'Ted Smith'),
 						),
 					),
 				),
-				// Expected query: TODO
-				TRUE,
-				NULL
+				// Expected query
+				array(
+					'$set' => array(
+						'post_title' => 'New post title',
+						'post_date' => new MongoDate(strtotime("26th March 2011, 11:24AM")),
+						'post_metadata.keywords' => 'new keywords, updated object',
+						'comment.1.author_name' => 'Dr. Smith',
+						'comment.1.author_email' => 'my.new.email@example.com',
+						'comment.1.likes' => array('Joe Bloggs', 'Ted Smith')
+					),
+					'$unset' => array('post_excerpt'),
+				)
 			),
 		);
 	}
@@ -1084,14 +1096,83 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	}
 
 	/**
-	 * @todo Test atomic operations with update()
+	 * Test that the update function creates the correct atomic operation
+	 * queries for updating data
+	 *
+	 * @test
+	 * @covers Mundo_Object::update
+	 * @dataProvider provider_update
+	 *
+	 * @param  array  array of model data to set and load
+	 * @param  array  array of model data to change
+	 * @param  array  expected atomic operation query
+	 * @return void
+	 */
+	public function test_update_updates_atomically($data, $changed_data, $expected_atomic_operation)
+	{
+		$document = new Model_Blogpost($data);
+
+		// Update requires a loaded document.
+		$document->load();
+
+		// Sanity check
+		if ( ! $document->loaded())
+		{
+			$this->fail("A document could not be loaded");
+		}
+
+		// Replace our $data variable with the full document in the DB (add the _id field)
+		$data = $document->get();
+
+		// Change our data
+		$document->set($changed_data);
+
+		$document->update();
+
+		// Merge our data to compare the new representation with what it should be
+		$merged_data = array_merge(Mundo::flatten($data), Mundo::flatten($changed_data));
+		$merged_data = Mundo::inflate($merged_data);
+
+		// Test that the update was as atomic as we expected
+		$this->assertEquals($document->last_update(), $expected_atomic_operation);
+
+		// Test that the data is now saved
+		$this->assertEquals($document->get(), $merged_data);
+
+		// Test that changed is now empty
+		$this->assertEmpty($document->changed());
+
+		// Sanity check: reload the model in a new object and compare data to ensure it went to the database A-OK
+		$reloaded_document = new Model_Blogpost()->set('_id', $document->get('_id'))->load();
+		$this->assertEquals($document->get(), $reloaded_document->get());
+	}
+
+
+	/**
+	 * @todo Test update() fails with invalid data
 	 */
 
 	/**
-	 * @todo Test atomic operations with update() on an unloaded model fail
+	 * Ensures that running the update method on an object that hasn't been
+	 * loaded from the database fails
+	 *
+	 * @test
+	 * @covers Mundo_Object::update
+	 * @expectedException Mundo_Exception
+	 * @expectedExceptionMessage Cannot atomically update the document because the model has not yet been loaded
+	 *
+	 * @return void
 	 */
+	public function test_updating_unloaded_object_fails()
+	{
+		$document = new Model_Blogpost;
 
-	/**
+		$document->set('post_title', 'This is the post title');
+
+		$document->update();
+	}
+            
+	/** 
 	 * @todo Test atomic operations using a query passed as an argument
 	 *       on loaded and unloaded models (maybe?)
 	 */
