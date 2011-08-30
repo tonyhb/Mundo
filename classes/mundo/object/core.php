@@ -558,8 +558,17 @@ class Mundo_Object_Core
 		if ( ! $this->changed())
 			return $this;
 
-		// Merge old and new data together.
-		$data = $this->_merge();
+		// Get our original data so we can merge changes
+		$data = $this->original();
+
+		// Flatten our changed data for set_path calls
+		$changed = Mundo::flatten($this->changed());
+
+		// For each piece of changed data merge it in.
+		foreach($changed as $field => $value)
+		{
+			Arr::set_path($data, $field, $value);
+		}
 
 		// Connect to and query the collection
 		$this->_init_db();
