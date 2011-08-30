@@ -140,19 +140,6 @@ class Mundo_Object_Core
 	}
 
 	/**
-	 * The logic behind the set() & __set() methods, set as protected to avoid 
-	 * accidentally setting the $parent_path parameter and to reduce confusion.
-	 *
-	 *
-	 * @param   array  $values        Values to set 
-	 * @param   string $parent_path   The path to our current field
-	 * @return  void
-	 */
-	protected function _set($values, $parent_path = NULL)
-	{
-	}
-
-	/**
 	 * Allow setting our field values by overloading, as in:
 	 *
 	 *    $model->field = $value;

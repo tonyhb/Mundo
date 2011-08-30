@@ -201,7 +201,6 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 *
 	 * @test
 	 * @covers Mundo_Object::set
-	 * @covers Mundo_Object::_set
 	 * @covers Mundo_Object::get
 	 * @covers Mundo_Object::changed
 	 * @dataProvider provider_set_and_get
@@ -253,7 +252,6 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 *
 	 * @test
 	 * @covers Mundo_Object::set
-	 * @covers Mundo_Object::_set
 	 * @covers Mundo_Object::__set
 	 * @covers Mundo_Object::get
 	 * @covers Mundo_Object::__get
@@ -391,7 +389,6 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @test
 	 * @covers Mundo_Object::get
 	 * @covers Mundo_Object::set
-	 * @covers Mundo_Object::_set
 	 * @covers Mundo_Object::changed
 	 * @dataProvider provider_single_set_and_get
 	 * @param  string  $field            Name of field we are setting
