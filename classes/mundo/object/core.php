@@ -118,82 +118,25 @@ class Mundo_Object_Core
 		if ( ! $values)
 			return $this;
 
-		// Call our set function
-		$this->_set($values);
+		// Flatten our set data
+		$values = Mundo::flatten($values);
 
-		return $this;
-	}
-
-	/**
-	 * The logic behind the set() & __set() methods, set as protected to avoid 
-	 * accidentally setting the $parent_path parameter and to reduce confusion.
-	 *
-	 *
-	 * @param   array  $values        Values to set 
-	 * @param   string $parent_path   The path to our current field
-	 * @return  void
-	 */
-	protected function _set($values, $parent_path = NULL)
-	{
 		foreach ($values as $field => $value)
 		{
-			if (strpos($field, '.') !== FALSE)
+			// Replace numerical keys with mongo's positional operator
+			$field_positional = preg_replace('#\.[0-9]+#', '.$', $field);
+
+			// $field_positional needs to be the whole array path or at least the first portion
+			if ( ! in_array($field_positional, $this->_fields) AND ! preg_grep('/^'.str_replace(array('$', '.'), array('\$', '\.'), $field_positional).'/', $this->_fields))
 			{
-				// We're using dot notation to set an embedded object, so separate our path string.
-				$paths = explode('.', $field);
-
-				// Pop the field name we are setting (the last element)
-				$field = array_pop($paths);
-
-				// Take the remaining keys as our parent path and array path
-				$parent_path = implode('.', $paths);
+				throw new Mundo_Exception("Field ':field' does not exist", array(':field' => $field));
 			}
 
-			// Set our working path as either the field name or the path to our field.
-			$path = ($parent_path) ? $parent_path.'.'.$field : $field;
-
-			if (is_array($value))
-			{
-				// Call set on the embedded object
-				$this->_set($value, $path);
-			}
-			else
-			{
-				if ($parent_path)
-				{
-					// Exchange numerical paths for the '$' indicator.
-					if ($object = Arr::path($this->_fields, preg_replace('#\.[0-9]+#', '.$', $parent_path)))
-					{
-						// Check to see that the field exists || we have an array that allows any kind of data || we are unsetting an embedded object
-						$field_exists = in_array($field, $object) || $object[0] == '$' || (array_key_exists($field, $object) AND $value === NULL);
-					}
-					else
-					{
-						// We could not get an object for the parent path, assume the field doesn't exist. 
-						// This should never happen, hence the code coverage tags. If it does, send me an email =D
-
-						// @codeCoverageIgnoreStart
-						$field_exists = FALSE;
-						// @codeCoverageIgnoreEnd
-					}
-				}
-				else
-				{
-					// CHeck to see if the value exists in the first array dimension, or if the array key exists for setting as embedded objects as null
-					$field_exists = in_array($field, $this->_fields) || (array_key_exists($field, $this->_fields) AND $value === NULL);
-				}
-
-				if ( ! $field_exists)
-				{
-					// Add the path to the field name to show where the error occurred
-					$field = ($parent_path) ? $parent_path.'.'.$field : $field;
-					throw new Mundo_Exception("Field ':field' does not exist", array(':field' => $field));
-				}
-
-				// Set our data
-				Arr::set_path($this->_changed, $path, $value);
-			}
+			// Set our data
+			Arr::set_path($this->_changed, $field, $value);
 		}
+
+		return $this;
 	}
 
 	/**
@@ -409,64 +352,50 @@ class Mundo_Object_Core
 	 */
 	protected function _extract_rules($data, $rules = NULL, $path = NULL)
 	{
+		// Our initially empty ruleset which will hold the collections entire rules
+		$ruleset = array();
 
+		// If rules werent provided through recursivity reformat.
 		if ( ! $rules)
 		{
-			// We have to manually set them with recusivity
 			$rules = $this->_rules;
 		}
 
-		foreach ($rules as $field => $rule)
+		foreach ($rules as $field => $rules)
 		{
-			
-			if ($field == '$')
+			if ( ! strpos($field, '$'))
 			{
-				// If this is an embedded collection, we need to work out how many collections we're accounting for.
-				// This is to assign validation rules to each collection member we have.
-				$collection_number = count(Arr::path($data, $path)) - 1;
-
-				if ($collection_number < 0)
-				{
-					// We have no embedded objects, so don't validate
-					continue;
-				}
-			}
-			else
-			{
-				// Add dots to our path (not necessary on the first traversal)
-				$dotted_path = $path ? $path.'.'.$field : $field;
-
-				// Hack to loop assignments once without collecitons
-				$collection_number = 1;
+				// The easiest of the bunch: just assign the rules
+				$ruleset[$path.$field] = $rules;
+				continue;
 			}
 
-			do
-			{
-				if ($field == '$')
-				{
-					// Add our collection number to our path (if we need to).
-					$dotted_path = $path ? $path.'.'.$collection_number : $collection_number;
-				}
+			// Explode the $field on the first positional modifier to go through each member collection
+			$field = explode('$', $field, 2);
 
-				if (Arr::is_assoc($rule))
-				{
-					// If $rule is an associative array this is an embedded object/coll. Run this again.
-					if ($embedded_rules = $this->_extract_rules($data, $rule, $dotted_path))
-					{
-						// Make sure we return it
-						$ruleset = isset($ruleset) ? Arr::merge($ruleset, $embedded_rules) : $embedded_rules;
-					}
-				}
-				else
-				{
-					// Assign our rule
-					$ruleset[$dotted_path] = $rule;
-				}
+			// Find out how many collections in this section we're accounting for
+			$collection_count = count(Arr::path($data, $path.$field[0])) - 1;
+
+			// We also need to add the collection's fields to the rules. They are separated 
+			// to field => $rule in the next function call in the for-each loop
+			$rules = array($field[1] => $rules);
+
+			// We need to loop through each collection and re-call the function to add the rules to it.
+			while($collection_count >= 0)
+			{
+				// Add the path to where we are, the field that contains the collections and the collection count together
+				$new_path = $path.$field[0].$collection_count;
+
+				// Pass the data, embedded collection fields and rules and new path together
+				$return = $this->_extract_rules($data, $rules, $new_path);
+
+				// Add the returns
+				$ruleset += $return;
+
+				$collection_count--;
 			}
-			while($collection_number--);
 		}
 
-		// Return our rules
 		return isset($ruleset) ? $ruleset : FALSE;
 	}
 

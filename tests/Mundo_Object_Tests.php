@@ -174,6 +174,24 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 				// Mundo should throw an error saying our field doesn't exist
 				"Field 'comments.0.embedded' does not exist", 
 			),
+			// Dot notation within normal keys
+			array(
+				array(
+					'post_title' => 'Example blog post',
+					'post_metadata.keywords' => 'keyword, another',
+					'post_metadata.description' => 'This is a post description keyword tag',
+					'author_name' => 'Author name',
+				),
+				NULL,
+				array(
+					'post_title' => 'Example blog post',
+					'post_metadata' => array(
+						'keywords' => 'keyword, another',
+						'description' => 'This is a post description keyword tag'
+					),
+					'author_name' => 'Author name'
+				)
+			),
 		);
 	}
 
@@ -183,7 +201,6 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 *
 	 * @test
 	 * @covers Mundo_Object::set
-	 * @covers Mundo_Object::_set
 	 * @covers Mundo_Object::get
 	 * @covers Mundo_Object::changed
 	 * @dataProvider provider_set_and_get
@@ -235,7 +252,6 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 *
 	 * @test
 	 * @covers Mundo_Object::set
-	 * @covers Mundo_Object::_set
 	 * @covers Mundo_Object::__set
 	 * @covers Mundo_Object::get
 	 * @covers Mundo_Object::__get
@@ -373,7 +389,6 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @test
 	 * @covers Mundo_Object::get
 	 * @covers Mundo_Object::set
-	 * @covers Mundo_Object::_set
 	 * @covers Mundo_Object::changed
 	 * @dataProvider provider_single_set_and_get
 	 * @param  string  $field            Name of field we are setting
