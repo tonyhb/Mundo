@@ -352,64 +352,50 @@ class Mundo_Object_Core
 	 */
 	protected function _extract_rules($data, $rules = NULL, $path = NULL)
 	{
+		// Our initially empty ruleset which will hold the collections entire rules
+		$ruleset = array();
 
+		// If rules werent provided through recursivity reformat.
 		if ( ! $rules)
 		{
-			// We have to manually set them with recusivity
 			$rules = $this->_rules;
 		}
 
-		foreach ($rules as $field => $rule)
+		foreach ($rules as $field => $rules)
 		{
-			
-			if ($field == '$')
+			if ( ! strpos($field, '$'))
 			{
-				// If this is an embedded collection, we need to work out how many collections we're accounting for.
-				// This is to assign validation rules to each collection member we have.
-				$collection_number = count(Arr::path($data, $path)) - 1;
-
-				if ($collection_number < 0)
-				{
-					// We have no embedded objects, so don't validate
-					continue;
-				}
-			}
-			else
-			{
-				// Add dots to our path (not necessary on the first traversal)
-				$dotted_path = $path ? $path.'.'.$field : $field;
-
-				// Hack to loop assignments once without collecitons
-				$collection_number = 1;
+				// The easiest of the bunch: just assign the rules
+				$ruleset[$path.$field] = $rules;
+				continue;
 			}
 
-			do
-			{
-				if ($field == '$')
-				{
-					// Add our collection number to our path (if we need to).
-					$dotted_path = $path ? $path.'.'.$collection_number : $collection_number;
-				}
+			// Explode the $field on the first positional modifier to go through each member collection
+			$field = explode('$', $field, 2);
 
-				if (Arr::is_assoc($rule))
-				{
-					// If $rule is an associative array this is an embedded object/coll. Run this again.
-					if ($embedded_rules = $this->_extract_rules($data, $rule, $dotted_path))
-					{
-						// Make sure we return it
-						$ruleset = isset($ruleset) ? Arr::merge($ruleset, $embedded_rules) : $embedded_rules;
-					}
-				}
-				else
-				{
-					// Assign our rule
-					$ruleset[$dotted_path] = $rule;
-				}
+			// Find out how many collections in this section we're accounting for
+			$collection_count = count(Arr::path($data, $path.$field[0])) - 1;
+
+			// We also need to add the collection's fields to the rules. They are separated 
+			// to field => $rule in the next function call in the for-each loop
+			$rules = array($field[1] => $rules);
+
+			// We need to loop through each collection and re-call the function to add the rules to it.
+			while($collection_count >= 0)
+			{
+				// Add the path to where we are, the field that contains the collections and the collection count together
+				$new_path = $path.$field[0].$collection_count;
+
+				// Pass the data, embedded collection fields and rules and new path together
+				$return = $this->_extract_rules($data, $rules, $new_path);
+
+				// Add the returns
+				$ruleset += $return;
+
+				$collection_count--;
 			}
-			while($collection_number--);
 		}
 
-		// Return our rules
 		return isset($ruleset) ? $ruleset : FALSE;
 	}
 

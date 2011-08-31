@@ -75,8 +75,8 @@ class Model_Blogpost extends Mundo_Object
 			array('Mundo::instance_of', array(':value', 'MongoId')),
 			array('not_empty'),
 		),
-		'author_name' => array(
-		array('regex', array(':value', '/^[\w\s]+$/')),
+		'author_name' =>array(
+			array('regex', array(':value', '/^[\w\s]+$/')),
 		),
 		'author_email' => array(
 			array('not_empty'),
@@ -85,32 +85,21 @@ class Model_Blogpost extends Mundo_Object
 		'post_content' => array(
 			array('not_empty'),
 		),
-		'comments' => array(
-			// Reference each embedded object
-			'$' => array(
-				// Each embedded object is as standard from here on out
-				'author_name' => array(
-					array('not_empty'),
-				),
-				'author_email' => array(
-					array('not_empty'),
-					array('email'),
-				),
-				'likes' => array(
-					'$' => array(
-						// Note we don't have field names and jump straight into the rules: this is a flat array
-						array('regex', array(':value', '/^[\w\s]+$/')),
-					)
-				)
-			)
+		'comments.$.author_name' => array(
+			array('not_empty'),
 		),
-		'post_metadata'  => array(
-			'keywords' => array(
-				array('not_empty'),
-			),
-			'description' => array(
-				array('not_empty'),
-			),
+		'comments.$.author_email' => array(
+			array('not_empty'),
+			array('email'),
+		),
+		'comments.$.likes.$' => array(
+			array('regex', array(':value', '/^[\w\s]+$/')),
+		),
+		'post_metadata.keywords' => array(
+			array('not_empty'),
+		),
+		'post_metadata.description' => array(
+			array('not_empty'),
 		),
 	);
 
