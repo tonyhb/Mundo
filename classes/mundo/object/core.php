@@ -192,35 +192,6 @@ class Mundo_Object_Core
 
 		// Set our $field to NULL
 		$this->set(array($field => NULL));
-
-		if ($changed)
-		{
-			if (strpos($field, '.') !== FALSE)
-			{
-				// We're using dot notation to unset an embedded object, so separate our path string.
-				$paths = explode('.', $field);
-
-				// Pop the field name we are unsetting (the last element)
-				$field = array_pop($paths);
-
-				// Take the remaining keys as our parent path and array path
-				$field_path = implode('.', $paths);
-
-				// Get the embedded object we are removing values from 
-				$changed = Arr::path($this->_changed, $field_path);
-
-				// Unset our data from the embedded object
-				unset($changed[$field]);
-
-				// Reset our altered embedded object
-				Arr::set_path($this->_changed, $field_path, $changed);
-			}
-			else
-			{
-				// Simple document field, just unset it
-				unset($this->_changed[$field]);
-			}
-		}
 	}
 
 	/**
@@ -234,10 +205,29 @@ class Mundo_Object_Core
 	{
 		if ( ! $path)
 		{
-			return $this->_merge(); 
+			// Flatten data so we can remove any NULL elements
+			$data = Mundo::flatten($this->_merge());
+
+			// Remove empty fields
+			$data = array_filter($data);
+
+			// Return purged data
+			return (empty($data)) ? NULL : Mundo::inflate($data);
 		}
 
-		return Arr::path($this->_merge(), $path);
+		// Flatten our field just in case
+		$data = Arr::path($this->_merge(), $path);
+
+		// If it's not an array return it
+		if ( ! is_array($data))
+			return $data;
+
+		$data = Mundo::flatten($data); 
+
+		// Remove empty fields
+		$data = array_filter($data);
+
+		return Mundo::inflate($data);
 	}
 
 	/**
@@ -250,7 +240,7 @@ class Mundo_Object_Core
 	{
 		if ( ! $path)
 		{
-			return $this->_changed; 
+			return $this->_changed;
 		}
 
 		return Arr::path($this->_changed, $path);
@@ -626,7 +616,7 @@ class Mundo_Object_Core
 	 *
 	 * @param  $field  the field we are pushing data onto
 	 * @param  $data1, $data2... Data to push onto the end of this array
-	 * @return this
+	 * @return int     the total number of elements in the array
 	 **/
 	public function push()
 	{
@@ -636,9 +626,9 @@ class Mundo_Object_Core
 		// Shift the field name from the data to append
 		$field = array_shift($args);
 
-		// Check this field exists
 		if ( ! $this->_check_field_exists($field))
 		{
+			// Fail because there's nothing to modify
 			throw new Mundo_Exception("Field ':field' does not exist", array(':field' => $field));
 		}
 
@@ -652,7 +642,37 @@ class Mundo_Object_Core
 			$count++;
 		}
 
-		return $this;
+		return $count;
+	}
+
+	/**
+	 * Removes the last element in the array $field and returns it.
+	 *
+	 * @param  $field  the field we are popping
+	 * @return mixed   popped data 
+	 */
+	public function pop($field)
+	{
+		// Get the most recent model data
+		$data = $this->get($field);
+
+		if ( ! is_array($data))
+		{
+			// We can only pop arrays
+			throw new Mundo_Exception("Field ':field' is not an array", array(':field' => $field));
+		}
+
+		// Find the last key we're modifying
+		$count = count($data) - 1;
+
+		// Set the last element of the array to null so it overwrites data in get()
+		$this->_changed[$field][$count] = NULL;
+
+		// Add this to $_next_update
+		$this->_next_update['$pop'] += array($field => 1);
+
+		// Return the element we just set to null from $data
+		return $data[$count];
 	}
 
 	/**
@@ -678,6 +698,26 @@ class Mundo_Object_Core
 	 * @var array
 	 **/
 	protected $_last_update;
+
+	/**
+	 * An array which contains the next atomical update to save $_changed
+	 * data in the collection. We organise all array fields so we don't
+	 * have to check if they exists to add to them when changing data.
+	 *
+	 * @var array
+	 */
+	protected $_next_update = array(
+			'$inc' => array(),
+			'$set' => array(),
+			'$unset' => array(),
+			'$push' => array(),
+			'$pushAll' => array(),
+			'$addToSet' => array(),
+			'$pop' => array(),
+			'$pull' => array(),
+			'$pullAll' => array(),
+			'$bit' => array(),
+		);
 
 	/**
 	 * Displays the last atomic operation as it would have been sent to the

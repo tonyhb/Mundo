@@ -816,20 +816,24 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		$this->assertInstanceOf('MongoId', $document->get('_id'));
 		$this->assertEmpty($document->changed());
 
-		foreach($data as $field => $value)
+		$fields = $document->get();
+		foreach($fields as $field => $value)
 		{
 			// Unset our already saved data
 			unset($document->$field);
 
 			$this->assertNull($document->changed($field));
-			$this->assertEquals($document->original($field), $data[$field]);
+			$this->assertEquals($document->original($field), $fields[$field]);
 		}
 
-		// Ensure that our array keys for the unset fields exist in changed
-		$changed_keys = array_keys($document->changed());
-		$data_keys = array_keys($data);
+		// Ensure that get() returns NULL because everything is unset
+		$this->assertEquals(NULL, $document->get());
 
-		$this->assertEquals($changed_keys, $data_keys);
+		// Assert that all of the keys now hold NULL
+		foreach($document->changed() as $value)
+		{
+			$this->assertNull($value);
+		}
 	}
 
 	/**
@@ -929,19 +933,21 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		$document = new Model_Blogpost($data);
 
 		// Try adding just one $push data
-		$document->push('comments', array('comment' => 'Comment 3'));
+		$doc_count = $document->push('comments', array('comment' => 'Comment 3'));
 
 		// Add the $push data to the original $data for testing
-		array_push($data['comments'], array('comment' => 'Comment 3'));
+		$data_count = array_push($data['comments'], array('comment' => 'Comment 3'));
 
 		// This should work the same as the normal function
 		$this->assertEquals($data['comments'], $document->get('comments'));
+		$this->assertEquals($doc_count, $data_count);
 
 
 		// Test adding multiple $push variables to the field
-		$document->push('comments', array('comment' => 'comment 4'), array('comment' => 'comment 5'));
-		array_push($data['comments'], array('comment' => 'comment 4'), array('comment' => 'comment 5'));
+		$doc_count = $document->push('comments', array('comment' => 'comment 4'), array('comment' => 'comment 5'));
+		$data_count = array_push($data['comments'], array('comment' => 'comment 4'), array('comment' => 'comment 5'));
 		$this->assertEquals($data['comments'], $document->get('comments'));
+		$this->assertEquals($doc_count, $data_count);
 
 
 		try
@@ -956,6 +962,44 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		}
 
 		$this->fail("Push() should raise an exception when trying to modify a field that does not exist");
+	}
+
+	/**
+	 * Tests the pop() method
+	 *
+	 * @test
+	 * @covers Mundo_Object::pop
+	 */
+	public function test_pop()
+	{
+		$data = array(
+			'post_title' => 'Title',
+			'post_content' => 'Content',
+			'post_metadata' => array(
+				'keywords' => 'keyword one',
+				'description' => 'keyword two',
+			),
+			'comments' => array(
+				array(
+					'comment' => 'Comment 1',
+				),
+				array(
+					'comment' => 'Comment 2',
+				),
+				array(
+					'comment' => 'Comment 3',
+				)
+			)
+		);
+
+		$document = new Model_Blogpost($data);
+
+		$doc_return = $document->pop('comments');
+		$var_return = array_pop($data['comments']);
+
+		$this->assertEquals($document->get('comments'), $data['comments']);
+		$this->assertEquals($doc_return, $var_return);
+
 	}
 
 	/**
@@ -1060,14 +1104,21 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		}
 
 		// Merge our data for the assertions
-		$merged_data = array_merge(Mundo::flatten($data), Mundo::flatten($changed_data));
-		$merged_data = Mundo::inflate($merged_data);
+		$flattened_data = Mundo::flatten($document->get());
+		$flattened_changed = Mundo::flatten($changed_data);
 
-		// And as this data had already been inserted by a previous test, we need to add the ID
-		$merged_data += array('_id' => $document->get('_id'));
+		foreach($flattened_data as $field => $value)
+		{
+			// Merge our arrays like this so the NULL mimicing unset takes effect
+			if (array_key_exists($field, $flattened_changed))
+				$flattened_data[$field] = $flattened_changed[$field];
+		}
+
+		$merged_data = Mundo::inflate($flattened_data);
 
 		// Update our values in the model
-		$document->set($changed_data)->save();
+		$document->set($changed_data);
+		$document->save();
 
 		// Original data will be $merged from above
 		$this->assertEquals($document->original(), $merged_data);

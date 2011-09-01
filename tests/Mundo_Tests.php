@@ -103,6 +103,24 @@ class MundoTests extends PHPUnit_Framework_TestCase
 			),
 			array(
 				array(
+					array(
+						'title' => 'title',
+						'content' => 'content',
+						'post_metadata' => array(
+							'keywords'    => 'specific id, mongoid',
+							'description' => 'Description tag here',
+						),
+					),
+				),
+				array(
+					'0.title' => 'title',
+					'0.content' => 'content',
+					'0.post_metadata.keywords' => 'specific id, mongoid',
+					'0.post_metadata.description' => 'Description tag here',
+				)
+			),
+			array(
+				array(
 					'post_title'    => 'Example blog post',
 					'post_slug'     => 'example-blog-post',
 					'post_date'     => new MongoDate(strtotime("2nd February 2011, 2:56PM")),

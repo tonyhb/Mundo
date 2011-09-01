@@ -83,7 +83,7 @@ class Mundo_Core
 		foreach ($data as $field => $value)
 		{
 			// Add the field to our path
-			$dot_path = ($path) ? $path.'.'.$field : $field;
+			$dot_path = ($path !== NULL) ? $path.'.'.$field : $field;
 
 			if (is_array($value))
 			{
