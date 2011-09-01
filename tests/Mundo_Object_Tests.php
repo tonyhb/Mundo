@@ -892,14 +892,30 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * Tests how the load() method handles loading with no data
 	 *
 	 * @covers Mundo_Object::load
-	 * @expectedException Mundo_Exception
-	 * @expectedExceptionMessage No model data supplied
+	 * @expectedException Mundo_exception
+	 * @expectedexceptionmessage no model data supplied
 	 * @return void
 	 */
 	public function test_document_loading_with_no_data()
 	{
-		$document = new Model_Blogpost;
+		$document = new model_blogpost;
 		$document->load();
+	}
+
+	/**
+	 * Ensures Mundo_Object throws an error when trying to access
+	 * an atomic operation key in _next_update that doesn't exist
+	 *
+	 * @test
+	 * @covers Mundo_Object::next_update
+	 * @expectedException Mundo_exception
+	 * @expectedexceptionmessage The atomic operation '$nonExistantatomic' does not exist
+	 * @return void
+	 */
+	public function test_incorrect_atomic_operators_with_next_update()
+	{
+		$doc = new Model_Blogpost;
+		$doc->next_update('$nonExistantAtomic');
 	}
 
 	public function provider_push()
@@ -939,14 +955,61 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 						),
 					),
 				),
-			)
+			),
+			array(
+				array(
+					'post_title' => 'Title',
+					'post_content' => 'Content',
+					'post_metadata' => array(
+						'keywords' => 'keyword one',
+						'description' => 'keyword two',
+					),
+					'comments' => array(
+						array(
+							'comment' => 'Comment 1',
+						)
+					)
+				),
+				TRUE,
+				array(
+					array(
+						'comment' => 'Comment 2'
+					),
+					array(
+						'comment' => 'Comment 3',
+						'author'  => '3rd comment author',
+					)
+				),
+				array(
+					array(
+						'comment' => 'Comment 1',
+					),
+					array(
+						'comment' => 'Comment 2'
+					),
+					array(
+						'comment' => 'Comment 3',
+						'author'  => '3rd comment author',
+					)
+				),
+				array(
+					'comments' => array(
+						array(
+							'comment' => 'Comment 2'
+						),
+						array(
+							'comment' => 'Comment 3',
+							'author'  => '3rd comment author',
+						)
+					),
+				),
+			),
 		);
 	}
 
-
-
 	/**
 	 * Tests the push() method, which replaces array_push on model data
+	 * These tests modify the comments field.
 	 *
 	 * @test
 	 * @covers Mundo_Object::push
@@ -960,27 +1023,54 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 */
 	public function test_push($data, $multiple_push_arrays, $push_data, $expected_result, $atomic_operation)
 	{
+		// Duplicate data so we can run multiple pushes twice (the data is modified by array_push)
+		$var_data = $data;
+
 		// Initialise our model
 		$document = new Model_Blogpost($data);
 
 		if ($multiple_push_arrays)
 		{
+			// Call push with multiple arrays
+			$doc_count = call_user_func_array(array($document, "push"), array_merge(array('comments'), $push_data));
+			$var_count = call_user_func_array('array_push', array_merge(array(&$var_data['comments']), $push_data));
 		}
 		else
 		{
 			// Add data to the array
 			$doc_count = $document->push('comments', $push_data);
-			$data_count = array_push($data['comments'], $push_data);
+			$var_count = array_push($var_data['comments'], $push_data);
 		}
 
 		// Ensure pushing the array had the expected results
 		$this->assertEquals($expected_result, $document->get('comments'));
 
 		// The model's push should work the same as the normal function
-		$this->assertEquals($data['comments'], $document->get('comments'));
-		$this->assertEquals($doc_count, $data_count);
+		$this->assertEquals($var_data['comments'], $document->get('comments'));
+		$this->assertEquals($doc_count, $var_count);
 
 		// Ensure that the atomic query for this change was written
+		$this->assertEquals($atomic_operation, $document->next_update('$pushAll'));
+
+		// If there are multiple push arrays try setting them one at a time now.
+		if ( ! $multiple_push_arrays)
+			return;
+
+		$var_data = $data;
+
+		$document = new Model_Blogpost($data);
+
+		foreach($push_data as $push)
+		{
+			$doc_count = $document->push('comments', $push);
+			$var_count = array_push($var_data['comments'], $push);
+
+			// Make sure everything's OK each time
+			$this->assertEquals($doc_count, $var_count);
+			$this->assertEquals($var_data['comments'], $document->get('comments'));
+		}
+
+		$this->assertEquals($expected_result, $document->get('comments'));
 		$this->assertEquals($atomic_operation, $document->next_update('$pushAll'));
 	}
 

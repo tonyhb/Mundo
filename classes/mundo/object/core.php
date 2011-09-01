@@ -745,15 +745,16 @@ class Mundo_Object_Core
 	 */
 	public function next_update($operator = NULL)
 	{
+		if ($operator === NULL)
+			return $this->_next_update;
+
 		if ( ! array_key_exists($operator, $this->_next_update))
 		{
 			throw new Mundo_Exception("The atomic operation ':operation' does not exist", array(':operation' => $operator));
 		}
 
-		if ($operator)
-			return $this->_next_update[$operator];
+		return $this->_next_update[$operator];
 
-		return $this->_next_update;
 	}
 
 	/**
