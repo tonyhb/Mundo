@@ -680,6 +680,13 @@ class Mundo_Object_Core
 		{
 			// If so, stop it from being added in $pushAll
 			array_pop($this->_next_update['$pushAll'][$field]);
+
+			// If that was the only atomic update for the $field, 
+			// remove the $field altogether
+			if (empty($this->_next_update['$pushAll'][$field]))
+			{
+				unset($this->_next_update['$pushAll'][$field]);
+			}
 		}
 		else
 		{

@@ -898,7 +898,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 */
 	public function test_document_loading_with_no_data()
 	{
-		$document = new model_blogpost;
+		$document = new Model_Blogpost;
 		$document->load();
 	}
 
@@ -1021,7 +1021,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @param $push data to push
 	 * @returns void
 	 */
-	public function test_push($data, $multiple_push_arrays, $push_data, $expected_result, $atomic_operation)
+	public function test_push_with_unsaved_data($data, $multiple_push_arrays, $push_data, $expected_result, $atomic_operation)
 	{
 		// Duplicate data so we can run multiple pushes twice (the data is modified by array_push)
 		$var_data = $data;
@@ -1093,7 +1093,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @test
 	 * @covers Mundo_Object::pop
 	 */
-	public function test_pop()
+	public function test_pop_with_unsaved_data()
 	{
 		$data = array(
 			'post_title' => 'Title',
@@ -1117,12 +1117,197 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 
 		$document = new Model_Blogpost($data);
 
+
 		$doc_return = $document->pop('comments');
 		$var_return = array_pop($data['comments']);
 
 		$this->assertEquals($document->get('comments'), $data['comments']);
 		$this->assertEquals($doc_return, $var_return);
 
+		try
+		{
+			// Test that popping a non-array field
+			$document->pop('post_title');
+		}
+		catch(Mundo_Exception $e)
+		{
+				$this->assertEquals($e->getMessage(), "Field 'post_title' is not an array");
+				return;
+		}
+
+		$this->fail("Model should have thrown an exception when attempting to pop a non-array field");
+	}
+
+	/**
+	 * Test that running pop() after push() works correctly.
+	 * Pop() should set the array key to NULL and also remove the $pushAll
+	 * query in _next_update.
+	 *
+	 * @test
+	 * @covers Mundo_Object::push
+	 * @covers Mundo_Object::pop
+	 * @return void
+	 */
+	public function test_unsaved_push_then_pop_then_push_then_pop()
+	{
+		$data = array(
+			'post_title' => 'Title',
+			'post_content' => 'Content',
+			'post_metadata' => array(
+				'keywords' => 'keyword one',
+				'description' => 'keyword two',
+			),
+			'comments' => array(
+				array(
+					'comment' => 'Comment 1',
+				),
+				array(
+					'comment' => 'Comment 2',
+				),
+				array(
+					'comment' => 'Comment 3',
+				)
+			)
+		);
+
+		$document = new Model_Blogpost($data);
+
+		$document->push('comments',
+			array(
+				'comment' => 'Comment 4',
+			)
+		);
+
+		// Basic sanity checks on the push
+		$this->assertEquals(
+			$document->next_update('$pushAll'), 
+			array(
+				'comments' => array(
+					array(
+						'comment' => 'Comment 4',
+					)
+				)
+			)
+		);
+
+		$this->assertEquals(
+			$document->get('comments'), 
+			array_merge(
+				$data['comments'], 
+				array(
+					array('comment' => 'Comment 4')
+				)
+			)
+		);
+
+		$pop = $document->pop('comments');
+
+		// Ensure we got the just-pushed embedded collection
+		$this->assertEquals($pop, array('comment' => 'Comment 4'));
+
+		// Ensure that the next update doesn't contain anything in $pullAll and
+		// instead removed the $pushAll query
+		$this->assertEquals(
+			$document->next_update(),
+			array(
+				'$inc' => array(),
+				'$set' => array(),
+				'$unset' => array(),
+				'$pushAll' => array(),
+				'$addToSet' => array(),
+				'$pop' => array(),
+				'$pullAll' => array(),
+				'$bit' => array(),
+			)
+		);
+
+		/** Now test running 2 pops and one pull leaves one in $pushAll */
+
+		// This also tests push() after pop()
+		$document->push('comments',
+			array(
+				'comment' => 'Comment 4',
+			),
+			array(
+				'comment' => 'Comment 5',
+			)
+		);
+
+		// Basic sanity checks on the push
+		$this->assertEquals(
+			$document->next_update('$pushAll'), 
+			array(
+				'comments' => array(
+					array(
+						'comment' => 'Comment 4',
+					),
+					array(
+						'comment' => 'Comment 5',
+					)
+				)
+			)
+		);
+
+		$this->assertEquals(
+			$document->get('comments'), 
+			array_merge(
+				$data['comments'], 
+				array(
+					array('comment' => 'Comment 4'),
+					array('comment' => 'Comment 5'),
+				)
+			)
+		);
+
+		$pop = $document->pop('comments');
+
+		// Ensure we got the just-pushed embedded collection
+		$this->assertEquals($pop, array('comment' => 'Comment 5'));
+		$this->assertEquals(count($document->get('comments')), 4);
+
+		// Ensure that the next update doesn't contain anything in $pullAll and
+		// instead removed the $pushAll query
+		$this->assertEquals(
+			$document->next_update(),
+			array(
+				'$inc' => array(),
+				'$set' => array(),
+				'$unset' => array(),
+				'$pushAll' => array(
+					'comments' => array(
+						array(
+							'comment' => 'Comment 4',
+						),
+					),
+				),
+				'$addToSet' => array(),
+				'$pop' => array(),
+				'$pullAll' => array(),
+				'$bit' => array(),
+			)
+		);
+
+		$pop = $document->pop('comments');
+
+		// Ensure we got the just-pushed embedded collection
+		$this->assertEquals($pop, array('comment' => 'Comment 4'));
+		$this->assertEquals(count($document->get('comments')), 3);
+
+		// Ensure that the next update doesn't contain anything in $pullAll and
+		// instead removed the $pushAll query
+		$this->assertEquals(
+			$document->next_update(),
+			array(
+				'$inc' => array(),
+				'$set' => array(),
+				'$unset' => array(),
+				'$pushAll' => array(),
+				'$addToSet' => array(),
+				'$pop' => array(),
+				'$pullAll' => array(),
+				'$bit' => array(),
+			)
+		);
 	}
 
 	/**
