@@ -40,6 +40,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		self::setUpBeforeClass();
 	}
 
+
 	/**
 	 * Provides test data for test_set_and_get
 	 *
@@ -203,6 +204,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @covers Mundo_Object::set
 	 * @covers Mundo_Object::get
 	 * @covers Mundo_Object::changed
+	 * @covers Mundo_Object::_check_field_exists
 	 * @dataProvider provider_set_and_get
 	 * @param  array  $data             The array of data to set
 	 * @param  mixed  $expected_error   Null if setting should pass, otherwise the error exception message.
@@ -257,6 +259,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @covers Mundo_Object::__get
 	 * @covers Mundo_Object::__isset
 	 * @covers Mundo_Object::changed
+	 * @covers Mundo_Object::_check_field_exists
 	 * @dataProvider provider_set_and_get
 	 * @param   string  $data 
 	 * @param   string  $expected_error 
@@ -389,6 +392,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @test
 	 * @covers Mundo_Object::get
 	 * @covers Mundo_Object::set
+	 * @covers Mundo_Object::_check_field_exists
 	 * @covers Mundo_Object::changed
 	 * @dataProvider provider_single_set_and_get
 	 * @param  string  $field            Name of field we are setting
@@ -892,6 +896,66 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	{
 		$document = new Model_Blogpost;
 		$document->load();
+	}
+
+	/**
+	 * Tests the push() method, which replaces array_push on model data
+	 *
+	 * @test
+	 * @covers Mundo_Object::push
+	 * @covers Mundo_Object::_check_field_exists
+	 *
+	 * @param $data initial data
+	 * @param $push data to push
+	 * @returns void
+	 */
+	public function test_push()
+	{
+		$data = array(
+				'post_title' => 'Title',
+				'post_content' => 'Content',
+				'post_metadata' => array(
+					'keywords' => 'keyword one',
+					'description' => 'keyword two',
+				),
+				'comments' => array(
+					array(
+						'comment' => 'Comment 2',
+					)
+				)
+			);
+
+		// Initialise our model
+		$document = new Model_Blogpost($data);
+
+		// Try adding just one $push data
+		$document->push('comments', array('comment' => 'Comment 3'));
+
+		// Add the $push data to the original $data for testing
+		array_push($data['comments'], array('comment' => 'Comment 3'));
+
+		// This should work the same as the normal function
+		$this->assertEquals($data['comments'], $document->get('comments'));
+
+
+		// Test adding multiple $push variables to the field
+		$document->push('comments', array('comment' => 'comment 4'), array('comment' => 'comment 5'));
+		array_push($data['comments'], array('comment' => 'comment 4'), array('comment' => 'comment 5'));
+		$this->assertEquals($data['comments'], $document->get('comments'));
+
+
+		try
+		{
+			$document->push('foo', array('bar' => FALSE));
+		}
+		catch(Mundo_Exception $e)
+		{
+			// Ensure push throws an error if the field doesn't exist
+			$this->assertEquals($e->getMessage(), "Field 'foo' does not exist");
+			return;
+		}
+
+		$this->fail("Push() should raise an exception when trying to modify a field that does not exist");
 	}
 
 	/**

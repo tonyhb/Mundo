@@ -123,11 +123,8 @@ class Mundo_Object_Core
 
 		foreach ($values as $field => $value)
 		{
-			// Replace numerical keys with mongo's positional operator
-			$field_positional = preg_replace('#\.[0-9]+#', '.$', $field);
-
-			// $field_positional needs to be the whole array path or at least the first portion
-			if ( ! in_array($field_positional, $this->_fields) AND ! preg_grep('/^'.str_replace(array('$', '.'), array('\$', '\.'), $field_positional).'/', $this->_fields))
+			// Check the field exists
+			if ( ! $this->_check_field_exists($field))
 			{
 				throw new Mundo_Exception("Field ':field' does not exist", array(':field' => $field));
 			}
@@ -619,9 +616,60 @@ class Mundo_Object_Core
 		// Remove the empty atomic operations
 		$query = array_filter($query);
 
-		echo Debug::vars($query);
+		// echo Debug::vars($query);
 	}
 
+	/**
+	 * Pushes $data onto the end of an array. This replaces array_push
+	 * because of overloaded properties, and accepts the same arguments
+	 * as array_push
+	 *
+	 * @param  $field  the field we are pushing data onto
+	 * @param  $data1, $data2... Data to push onto the end of this array
+	 * @return this
+	 **/
+	public function push()
+	{
+		// Get the function arguments
+		$args = func_get_args();
+
+		// Shift the field name from the data to append
+		$field = array_shift($args);
+
+		// Check this field exists
+		if ( ! $this->_check_field_exists($field))
+		{
+			throw new Mundo_Exception("Field ':field' does not exist", array(':field' => $field));
+		}
+
+		// Find out how many embedded collections are in $field (this will give us the next array key too)
+		$count = count($this->get($field));
+
+		// Loop through each piece of data to push onto the $field
+		foreach($args as $data)
+		{
+			$this->_changed[$field][$count] = $data;
+			$count++;
+		}
+
+		return $this;
+	}
+
+	/**
+	 * Helper function which takes a field name and checks if it has been
+	 * defined in the model
+	 *
+	 * @param $field  string  field name
+	 * @return bool
+	 */
+	protected function _check_field_exists($field)
+	{
+		// Replace any positional modifier keys with '$'
+		$field = preg_replace('#\.[0-9]+#', '.$', $field);
+
+		// If the field exists or it is the parent of an embedded collection return true
+		return (in_array($field, $this->_fields) OR preg_grep('/^'.str_replace(array('$', '.'), array('\$', '\.'), $field).'\./', $this->_fields));
+	}
 
 	/**
 	 * Stores an array containing the last update() query sent to the driver
