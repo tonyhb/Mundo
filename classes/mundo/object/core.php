@@ -642,6 +642,16 @@ class Mundo_Object_Core
 			$count++;
 		}
 
+		if (isset($this->_next_update['$pushAll'][$field]))
+		{
+			// Add the data to the $pushAll
+			$this->_next_update['$pushAll'][$field] = array_merge($this->_next_update['$pushAll'][$field], $args);
+		}
+		else
+		{
+			$this->_next_update['$pushAll'][$field] = $args;
+		}
+
 		return $count;
 	}
 
@@ -665,11 +675,20 @@ class Mundo_Object_Core
 		// Find the last key we're modifying
 		$count = count($data) - 1;
 
+		// Is this a variable that has been pushed and hasn't been written to the database?
+		if (isset($this->_changed[$field][$count]) AND isset($this->_next_update['$pushAll'][$field]))
+		{
+			// If so, stop it from being added in $pushAll
+			array_pop($this->_next_update['$pushAll'][$field]);
+		}
+		else
+		{
+			// Add this to $_next_update
+			$this->_next_update['$pop'] += array($field => 1);
+		}
+
 		// Set the last element of the array to null so it overwrites data in get()
 		$this->_changed[$field][$count] = NULL;
-
-		// Add this to $_next_update
-		$this->_next_update['$pop'] += array($field => 1);
 
 		// Return the element we just set to null from $data
 		return $data[$count];
@@ -710,14 +729,32 @@ class Mundo_Object_Core
 			'$inc' => array(),
 			'$set' => array(),
 			'$unset' => array(),
-			'$push' => array(),
-			'$pushAll' => array(),
+			'$pushAll' => array(), // This takes care of $push
 			'$addToSet' => array(),
 			'$pop' => array(),
-			'$pull' => array(),
-			'$pullAll' => array(),
+			'$pullAll' => array(), // This takes care of $pull
 			'$bit' => array(),
 		);
+
+	/**
+	 * Returns the query used to atomically update currently changed data
+	 *
+	 * @param  string  Atomic operator to return. Will return all atomic 
+	 *                 operations by default
+	 * @return array
+	 */
+	public function next_update($operator = NULL)
+	{
+		if ( ! array_key_exists($operator, $this->_next_update))
+		{
+			throw new Mundo_Exception("The atomic operation ':operation' does not exist", array(':operation' => $operator));
+		}
+
+		if ($operator)
+			return $this->_next_update[$operator];
+
+		return $this->_next_update;
+	}
 
 	/**
 	 * Displays the last atomic operation as it would have been sent to the
