@@ -533,18 +533,93 @@ class Mundo_Object_Core
 		if ( ! $this->changed())
 			return $this;
 
-		// Initialise an empty driver query
-		$query = array();
+		// Initialise an array with all atomic operations as keys
+		$query = array(
+			'$inc' => array(),
+			'$set' => array(),
+			'$unset' => array(),
+			'$push' => array(),
+			'$pushAll' => array(),
+			'$addToSet' => array(),
+			'$pop' => array(),
+			'$pull' => array(),
+			'$pullAll' => array(),
+			'$bit' => array(),
+		);
 
 		// Take our changed and original and flatten them for comparison
 		$changed = Mundo::flatten($this->changed());
 		$original = Mundo::flatten($this->original());
 
-		echo Debug::vars($changed, $original);
-
 		foreach ($changed as $field => $value)
 		{
+			// If this exists but the new one is null, $unset it
+			if ($value === NULL)
+			{
+				$query['$unset'] += array($field => 1);
+				continue;
+			}
+
+			// Are we amending a field that has at least one positional modifier in it?
+			if ( ! in_array($field, $this->_fields) AND in_array(preg_replace('#\.[0-9]+#', '.$', $field), $this->_fields))
+			{
+				// Instantly we know there will be a $push/$pull etc. modifier to the container array.
+
+				// If this arose from an array_push, $push it etc.
+				// A flat out $model->set() is a complete replacement.
+				continue;
+			}
+
+			// If the value is an array, test for array modifiers.
+			if (is_array($value))
+			{
+				// Are we adding to the array?
+			}
+
+			// If this is numeric, $ing it
+			// Everything is a $set by default
+			$query['$set'] += array($field => $value);
 		}
+
+		/*
+		 * Testing shit really. Ignore
+		foreach ($this->_changed as $field => $value)
+		{
+			// If this exists but the new one is null, $unset it
+			if ($value === NULL)
+			{
+				$query['$unset'] += array($field => 1);
+				continue;
+			}
+
+			if (is_array($value))
+			{
+				// If this is an associative array, set it using dot notation as you would in the shell
+				if (Arr::is_assoc($value))
+				{
+					// Get our array keys
+					$keys = array_keys($value);
+					foreach ($keys as $key)
+					{
+
+					echo Debug::vars($field);
+
+					//$query['$set'] += array($field.'.'.$value
+				}
+
+				echo Debug::vars($value, Arr::is_assoc($value));
+			}
+
+			// Everything is a $set by default
+			$query['$set'] += array($field => $value);
+		}
+		*/
+
+
+		// Remove the empty atomic operations
+		$query = array_filter($query);
+
+		echo Debug::vars($query);
 	}
 
 
