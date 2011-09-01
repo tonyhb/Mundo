@@ -215,13 +215,13 @@ class Mundo_Object_Core
 			return (empty($data)) ? NULL : Mundo::inflate($data);
 		}
 
-		// Flatten our field just in case
 		$data = Arr::path($this->_merge(), $path);
 
 		// If it's not an array return it
 		if ( ! is_array($data))
 			return $data;
 
+		// Flatten the data
 		$data = Mundo::flatten($data); 
 
 		// Remove empty fields
