@@ -1,14 +1,15 @@
 ## Mundo
 
-Mundo is (will be) a mapping system written for the MongoDB Database and the [Kohana Framework](http://kohanaframework.org/).
+Mundo is a mapping system written for the MongoDB Database and the [Kohana Framework](http://kohanaframework.org/).
 
-So, I'm currently developing this and it's _not even in alpha!_ Hopefully, by the first release, Mundo should do the following:
+It's currently in alpha - just released - and can do the following:
 
 * Validate model data (including embedded objects and collections)
 * Provide an object for the model's state and data
-* Filter and change the model's data when updated (where necessary)
 * Automatically update collections using atomic operations where possible
 
-_"Cool!"_, you say?! Yeah, I hope so too. We'll have to wait and see though.
+There's example usage in the tests folder and the code is well commented (hopefully).
 
-Stay tuned!
+It's been unit tested and has complete line coverage, but it's not quite comprehensive yet. Any help welcome ;)
+
+Stay tuned for more info!
