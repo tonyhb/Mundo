@@ -563,7 +563,7 @@ class Mundo_Object_Core
 		if ( ! $data)
 		{
 			// Use already set data if none is given
-			$data = $this->_merge();
+			$data = $this->get();
 		}
 
 		$flat_data = Mundo::flatten($data);
@@ -837,6 +837,9 @@ class Mundo_Object_Core
 		// Do no work if possible.
 		if ( ! $this->changed())
 			return $this;
+
+		// Validate our data
+		$this->_validate();
 
 		$this->_init_db();
 
