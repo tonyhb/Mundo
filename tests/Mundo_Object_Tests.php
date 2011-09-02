@@ -1046,19 +1046,15 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 			$loaded_object->load();
 			$this->assertEquals($loaded_object->get(), $document->original());	
 
-			// Ensure we can't run create() when we already have an ObjectId in our data			
-			$document = new Model_Blogpost($saved_data);
-
+			// Ensure we can't run create() when the model is alread loaded
 			try
 			{
 				$document->create();
 			}
 			catch(Mundo_Exception $e)
 			{
-				$this->assertSame($e->getMessage(), "Creating failed: a document with ObjectId '".$document->get('_id')."' exists already.");
+				$this->assertSame($e->getMessage(), "Cannot create a new document because the model is already loaded");
 
-				// Assert we're not loaded
-				$this->assertFalse($document->loaded());
 				return;
 			}
 
