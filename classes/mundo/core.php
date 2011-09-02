@@ -85,7 +85,7 @@ class Mundo_Core
 			// Add the field to our path
 			$dot_path = ($path !== NULL) ? $path.'.'.$field : $field;
 
-			if (is_array($value))
+			if (is_array($value) AND ! empty($value))
 			{
 				// Call this function again on embedded collections or objects with our path reference
 				$flat += self::_flatten($value, $dot_path);
