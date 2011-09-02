@@ -101,7 +101,8 @@ class Mundo_Object_Core
 	 * Assigns field data by name. Assigned variables will first be added to
 	 * the $_changed variable until the collection has been updated.
 	 *
-	 * @todo Allow setting of data through dot path notation (eg. comment.author)
+	 * This also handles the following positional modifier updates:
+	 *   $set, $unset, $inc
 	 *
 	 * @param  mixed  field name or an array of field => values 
 	 * @param  mixed  field value 
@@ -109,7 +110,7 @@ class Mundo_Object_Core
 	 */
 	public function set($values, $value = NULL)
 	{
-		if ($value)
+		if ($value OR ! is_array($values))
 		{
 			// Normalise single field setting to multiple field setting
 			$values = array($values => $value);
@@ -123,6 +124,13 @@ class Mundo_Object_Core
 
 		foreach ($values as $field => $value)
 		{
+			if ($value === NULL)
+			{
+				// Call the unset method
+				$this->unset_atomic($field);
+				continue;
+			}
+
 			// Check the field exists
 			if ( ! $this->_check_field_exists($field))
 			{
@@ -131,6 +139,24 @@ class Mundo_Object_Core
 
 			// Set our data
 			Arr::set_path($this->_changed, $field, $value);
+
+
+			// If this isn't an unset, make sure the $unset operation isn't set
+			if (isset($this->_next_update['$unset'][$field]))
+			{
+				unset($this->_next_update['$unset'][$field]);
+			}
+
+			if (is_numeric($value) AND is_numeric($this->original($field)))
+			{
+				// Work out difference for incrementing
+				$difference = $value - $this->original($field);
+				$this->_next_update['$inc'] = array_merge($this->_next_update['$inc'], array($field => $difference));
+				continue;
+			}
+
+			// This must be a $set
+			$this->_next_update['$set'] = array_merge($this->_next_update['$set'], array($field => $value));
 		}
 
 		return $this;
@@ -148,6 +174,57 @@ class Mundo_Object_Core
 	public function __set($field, $value)
 	{
 		$this->set($field, $value);
+	}
+
+	/**
+	 * Unsets $field data.
+	 *
+	 * This function sets the field data in $_changed to NULL and adds the
+	 * $unset atomic operation.
+	 *
+	 * Note that this has atomic_ suffix because there's already a function
+	 * called unset. Of course.
+	 *
+	 * @param  string  Field name to set, in dot notation form
+	 * @return $this
+	 */
+	public function unset_atomic($field)
+	{
+		// If there isn't any original data or changed data set, return
+		if ( ! $this->original($field) AND ! $this->changed($field))
+			return $this;
+
+		// Set the changed data to null
+		Arr::set_path($this->_changed, $field, NULL);
+
+		// Flatten the update array so we can check this doens't exist elsewhere
+		$next_update = Mundo::flatten($this->_next_update);
+
+		$preg_field = str_replace('.', '\.', $field);
+
+		// Check the flattened update array to see that there are no other atomic operations for this field
+		$key = preg_grep('#^\$[a-zA-Z]+\.'.$preg_field.'#', array_keys($next_update));
+
+		if ( ! empty($key))
+		{
+			// Get the first key
+			$key = array_shift($key);
+
+			// Remove the atomic operation from the flat update array
+			unset($next_update[$key]);
+		}
+
+		// Replace our update variable with the removed key
+		$this->_next_update = Mundo::inflate($next_update);
+
+		// Removing the previous atomic operation may have been enough, but if the original exists unset the data
+		if ($this->original($field) !== NULL)
+		{
+			// We don't need to array merge because the value will always be 1
+			$this->_next_update['$unset'] += array($field => 1);
+		}
+
+		return $this;
 	}
 
 	/**
@@ -183,15 +260,7 @@ class Mundo_Object_Core
 	 */
 	public function __unset($field)
 	{
-		// If there isn't any original data or changed data set, return
-		if ( ! $this->original($field) AND ! $this->changed($field))
-			return;
-
-		// If the field has been changed and there is no original data, we need to remove it from our changed array
-		$changed = $this->changed($field) AND ! $this->original($field);
-
-		// Set our $field to NULL
-		$this->set(array($field => NULL));
+		$this->unset_atomic($field);
 	}
 
 	/**
@@ -451,6 +520,9 @@ class Mundo_Object_Core
 		// Reset our $_changed to empty after our save
 		$this->_changed = array();
 
+		// Reset the update variable
+		$this->_reset_update();
+
 		// Update our saved data variable
 		$this->_data = $data;
 
@@ -493,6 +565,9 @@ class Mundo_Object_Core
 		// Reset our changed array
 		$this->_changed = array();
 
+		// Reset the update variable
+		$this->_reset_update();
+
 		// Replace our data just in case an upsert created an ID
 		$this->_data = $data;
 
@@ -520,93 +595,6 @@ class Mundo_Object_Core
 		if ( ! $this->changed())
 			return $this;
 
-		// Initialise an array with all atomic operations as keys
-		$query = array(
-			'$inc' => array(),
-			'$set' => array(),
-			'$unset' => array(),
-			'$push' => array(),
-			'$pushAll' => array(),
-			'$addToSet' => array(),
-			'$pop' => array(),
-			'$pull' => array(),
-			'$pullAll' => array(),
-			'$bit' => array(),
-		);
-
-		// Take our changed and original and flatten them for comparison
-		$changed = Mundo::flatten($this->changed());
-		$original = Mundo::flatten($this->original());
-
-		foreach ($changed as $field => $value)
-		{
-			// If this exists but the new one is null, $unset it
-			if ($value === NULL)
-			{
-				$query['$unset'] += array($field => 1);
-				continue;
-			}
-
-			// Are we amending a field that has at least one positional modifier in it?
-			if ( ! in_array($field, $this->_fields) AND in_array(preg_replace('#\.[0-9]+#', '.$', $field), $this->_fields))
-			{
-				// Instantly we know there will be a $push/$pull etc. modifier to the container array.
-
-				// If this arose from an array_push, $push it etc.
-				// A flat out $model->set() is a complete replacement.
-				continue;
-			}
-
-			// If the value is an array, test for array modifiers.
-			if (is_array($value))
-			{
-				// Are we adding to the array?
-			}
-
-			// If this is numeric, $ing it
-			// Everything is a $set by default
-			$query['$set'] += array($field => $value);
-		}
-
-		/*
-		 * Testing shit really. Ignore
-		foreach ($this->_changed as $field => $value)
-		{
-			// If this exists but the new one is null, $unset it
-			if ($value === NULL)
-			{
-				$query['$unset'] += array($field => 1);
-				continue;
-			}
-
-			if (is_array($value))
-			{
-				// If this is an associative array, set it using dot notation as you would in the shell
-				if (Arr::is_assoc($value))
-				{
-					// Get our array keys
-					$keys = array_keys($value);
-					foreach ($keys as $key)
-					{
-
-					echo Debug::vars($field);
-
-					//$query['$set'] += array($field.'.'.$value
-				}
-
-				echo Debug::vars($value, Arr::is_assoc($value));
-			}
-
-			// Everything is a $set by default
-			$query['$set'] += array($field => $value);
-		}
-		*/
-
-
-		// Remove the empty atomic operations
-		$query = array_filter($query);
-
-		// echo Debug::vars($query);
 	}
 
 	/**
@@ -681,10 +669,10 @@ class Mundo_Object_Core
 			// If so, stop it from being added in $pushAll
 			array_pop($this->_next_update['$pushAll'][$field]);
 
-			// If that was the only atomic update for the $field, 
-			// remove the $field altogether
+			// If that was the only atomic update for the $field...
 			if (empty($this->_next_update['$pushAll'][$field]))
 			{
+				// Remove the $field completely
 				unset($this->_next_update['$pushAll'][$field]);
 			}
 		}
@@ -733,14 +721,14 @@ class Mundo_Object_Core
 	 * @var array
 	 */
 	protected $_next_update = array(
+			'$pushAll' => array(), // This takes care of $push
+			'$pullAll' => array(), // This takes care of $pull
+			'$addToSet' => array(),
+			'$pop' => array(),
+			'$bit' => array(),
 			'$inc' => array(),
 			'$set' => array(),
 			'$unset' => array(),
-			'$pushAll' => array(), // This takes care of $push
-			'$addToSet' => array(),
-			'$pop' => array(),
-			'$pullAll' => array(), // This takes care of $pull
-			'$bit' => array(),
 		);
 
 	/**
@@ -773,6 +761,25 @@ class Mundo_Object_Core
 	public function last_update()
 	{
 		return $this->_last_update;
+	}
+
+	/**
+	 * Resets the $_next_update protected variable
+	 *
+	 * @return void;
+	 */
+	protected function _reset_update()
+	{
+		$this->_next_update = array(
+			'$pushAll' => array(),
+			'$pullAll' => array(),
+			'$addToSet' => array(),
+			'$pop' => array(),
+			'$bit' => array(),
+			'$inc' => array(),
+			'$set' => array(),
+			'$unset' => array(),
+		);
 	}
 
 	/**

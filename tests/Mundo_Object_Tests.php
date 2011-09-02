@@ -1126,18 +1126,9 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 
 		// Make sure that our atomic update is OK
 		$this->assertEquals(
-			$document->next_update(),
+			$document->next_update('$pop'),
 			array(
-				'$inc' => array(),
-				'$set' => array(),
-				'$unset' => array(),
-				'$pushAll' => array(),
-				'$addToSet' => array(),
-				'$pop' => array(
-					'comments' => 1,
-				),
-				'$pullAll' => array(),
-				'$bit' => array(),
+				'comments' => 1,
 			)
 		);
 
@@ -1222,20 +1213,15 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		// Ensure we got the just-pushed embedded collection
 		$this->assertEquals($pop, array('comment' => 'Comment 4'));
 
-		// Ensure that the next update doesn't contain anything in $popAll and
+		// Ensure that the next update doesn't contain anything in $pop and
 		// instead removed the $pushAll query
 		$this->assertEquals(
-			$document->next_update(),
-			array(
-				'$inc' => array(),
-				'$set' => array(),
-				'$unset' => array(),
-				'$pushAll' => array(),
-				'$addToSet' => array(),
-				'$pop' => array(),
-				'$pullAll' => array(),
-				'$bit' => array(),
-			)
+			$document->next_update('$pushAll'),
+			array()
+		);
+		$this->assertEquals(
+			$document->next_update('$pop'),
+			array()
 		);
 
 		/** Now test running 2 pops and one pull leaves one in $pushAll */
@@ -1282,26 +1268,21 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		$this->assertEquals($pop, array('comment' => 'Comment 5'));
 		$this->assertEquals(count($document->get('comments')), 4);
 
-		// Ensure that the next update doesn't contain anything in $popAll and
+		// Ensure that the next update doesn't contain anything in $pop and
 		// instead removed the $pushAll query
 		$this->assertEquals(
-			$document->next_update(),
+			$document->next_update('$pushAll'),
 			array(
-				'$inc' => array(),
-				'$set' => array(),
-				'$unset' => array(),
-				'$pushAll' => array(
-					'comments' => array(
-						array(
-							'comment' => 'Comment 4',
-						),
+				'comments' => array(
+					array(
+						'comment' => 'Comment 4',
 					),
 				),
-				'$addToSet' => array(),
-				'$pop' => array(),
-				'$pullAll' => array(),
-				'$bit' => array(),
 			)
+		);
+		$this->assertEquals(
+			$document->next_update('$pop'),
+			array()
 		);
 
 		$pop = $document->pop('comments');
@@ -1310,21 +1291,17 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		$this->assertEquals($pop, array('comment' => 'Comment 4'));
 		$this->assertEquals(count($document->get('comments')), 3);
 
-		// Ensure that the next update doesn't contain anything in $popAll and
+		// Ensure that the next update doesn't contain anything in $pop and
 		// instead removed the $pushAll query
 		$this->assertEquals(
-			$document->next_update(),
-			array(
-				'$inc' => array(),
-				'$set' => array(),
-				'$unset' => array(),
-				'$pushAll' => array(),
-				'$addToSet' => array(),
-				'$pop' => array(),
-				'$pullAll' => array(),
-				'$bit' => array(),
-			)
+			$document->next_update('$pushAll'),
+			array()
 		);
+		$this->assertEquals(
+			$document->next_update('$pop'),
+			array()
+		);
+
 	}
 
 	/**
