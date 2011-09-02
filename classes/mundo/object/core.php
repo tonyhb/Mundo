@@ -719,33 +719,15 @@ class Mundo_Object_Core
 	/**
 	 * Creates a new document in our collection
 	 *
-	 * @return  mixed  $this
+	 * @return  mixed  Same as MongoCollection::insert (@see 
+	 *                 http://php.net/manual/en/mongocollection.insert.php)
 	 * @throws  mixed  Validation_Exception, Mundo_Exception
 	 */
 	public function create()
 	{
-		if ($this->get('_id'))
+		if ($this->_loaded == TRUE)
 		{
-			// Running the load() method alters $_loaded, so we need to duplicate our class
-
-			// Get the model class name (PHP => 5.3.X )
-			$class = get_called_class();
-
-			// Create a duplicate class; 
-			$object = new $class;
-
-			// Assign our ID
-			$object->set('_id', $this->get('_id'));
-
-			// See if an object with this ID exists
-			if($object->load($this->get('_id'))->loaded())
-			{
-				// We cannot create a document with a duplicate ID
-				Throw new Mundo_Exception("Creating failed: a document with ObjectId ':object_id' exists already.", array(":object_id" => $this->get('_id')));
-			}
-
-			// Garbage collection
-			unset($object, $class);
+			throw new Mundo_Exception("Cannot create a new document because the model is already loaded");
 		}
 
 		// Ensure our data is valid
@@ -758,21 +740,11 @@ class Mundo_Object_Core
 		$data = $this->_merge();
 
 		// Insert our data
-		$this->_collection->insert($data, array('safe' => $this->_safe));
+		$return = $this->_collection->insert($data, array('safe' => $this->_safe));
 
-		// Reset our $_changed to empty after our save
-		$this->_changed = array();
+		$this->_clean_up($data);
 
-		// Reset the update variable
-		$this->_reset_update();
-
-		// Update our saved data variable
-		$this->_data = $data;
-
-		// We're now loaded
-		$this->_loaded = TRUE;
-
-		return $this;
+		return $return;
 	}
 
 	/**
@@ -805,17 +777,7 @@ class Mundo_Object_Core
 		$this->_init_db();
 		$this->_collection->save($data, array('safe' => $this->_safe));
 
-		// Reset our changed array
-		$this->_changed = array();
-
-		// Reset the update variable
-		$this->_reset_update();
-
-		// Replace our data just in case an upsert created an ID
-		$this->_data = $data;
-
-		// Ensure we're loaded if that was an upsert
-		$this->_loaded = TRUE;
+		$this->_clean_up($data);
 
 		return $this;
 	}
@@ -861,20 +823,10 @@ class Mundo_Object_Core
 			Arr::set_path($data, $field, $value);
 		}
 
-		// Reset our changed array
-		$this->_changed = array();
-
 		// Copy the next update into last update
 		$this->_last_update = $update;
 
-		// Reset the update variable
-		$this->_reset_update();
-
-		// Replace our data just in case an upsert created an ID
-		$this->_data = $data;
-
-		// Ensure we're loaded if that was an upsert
-		$this->_loaded = TRUE;
+		$this->_clean_up($data);
 
 		return $status;
 	}
@@ -943,6 +895,29 @@ class Mundo_Object_Core
 		);
 	}
 
+	/**
+	 * Helper function for database interction methods.
+	 *
+	 * This is the model cleanup process after successful communication
+	 * with MongoDB
+	 *
+	 * @param  $array  new model data from database communication
+	 * @return void
+	 */
+	protected function _clean_up($data)
+	{
+		// Reset our $_changed to empty after our save
+		$this->_changed = array();
+
+		// Reset the update variable
+		$this->_reset_update();
+
+		// Update our saved data variable
+		$this->_data = $data;
+
+		// We're now loaded
+		$this->_loaded = TRUE;
+	}
 	/**
 	 * Connect to Mongo for queries
 	 *
