@@ -140,9 +140,7 @@ class Mundo_Object_Core
 			// Set our data
 			Arr::set_path($this->_changed, $field, $value);
 
-
-			/*
-			// If this isn't an unset, make sure the $unset operation isn't set
+			// Make sure the $unset operation isn't set
 			if (isset($this->_next_update['$unset'][$field]))
 			{
 				unset($this->_next_update['$unset'][$field]);
@@ -158,7 +156,6 @@ class Mundo_Object_Core
 
 			// This must be a $set
 			$this->_next_update['$set'] = array_merge($this->_next_update['$set'], array($field => $value));
-			 */
 
 		}
 
@@ -184,6 +181,9 @@ class Mundo_Object_Core
 	 *
 	 * This function sets the field data in $_changed to NULL and adds the
 	 * $unset atomic operation.
+	 * 
+	 * It does NOT remove the field from $_changed, otherwise the save
+	 * method will save old data.
 	 *
 	 * Note that this has atomic_ suffix because there's already a function
 	 * called unset. Of course.
@@ -217,8 +217,14 @@ class Mundo_Object_Core
 			unset($next_update[$key]);
 		}
 
-		// Replace our update variable with the removed key
-		$this->_next_update = Mundo::inflate($next_update);
+		// Inflate the array ready for replacement
+		$next_update = Mundo::inflate($next_update);
+
+		// Unsetting the last operation for an atomic operator removes it completely
+		$this->_reset_update();
+
+		// So merge the empty (reset) next update with the updated one
+		$this->_next_update = array_merge($this->_next_update, $next_update);
 
 		// Removing the previous atomic operation may have been enough, but if the original exists unset the data
 		if ($this->original($field) !== NULL)
@@ -229,6 +235,48 @@ class Mundo_Object_Core
 
 		return $this;
 	}
+
+	/**
+	 * Helper function for the atomic operation $inc
+	 *
+	 * This function passes all logic thanks to set() and only checks that
+	 * the current operation uses numeric values.
+	 *
+	 * @param  mixed    field name or array of field => values
+	 * @param  numeric  amount to increase or decrease by
+	 * @return void
+	 */
+	public function inc($values, $value)
+	{
+		if ($value)
+		{
+			// Normalise single field setting to multiple field setting
+			$values = array($values => $value);
+		}
+
+		$values = Mundo::flatten($values);
+
+		foreach($values as $field => $value)
+		{
+			if ( ! is_numeric($this->get($field)))
+			{
+				// Non-numeric, cant $inc
+				throw new Mundo_Exception("Cannot apply $inc modifier to non-number in field ':field'", array(':field', $field));
+			}
+
+			if ( ! is_numeric($value))
+			{
+				// Can only apply $inc modifier with numeric values
+				throw new Mundo_Exception("Cannot apply $inc with non-numeric values in field ':field'", array(':field', $field));
+			}
+		}
+
+		$this->set($values);
+
+		return $this;
+	}
+
+
 
 	/**
 	 * Allow retrieving field values via overloading.
