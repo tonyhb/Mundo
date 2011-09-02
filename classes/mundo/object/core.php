@@ -141,6 +141,7 @@ class Mundo_Object_Core
 			Arr::set_path($this->_changed, $field, $value);
 
 
+			/*
 			// If this isn't an unset, make sure the $unset operation isn't set
 			if (isset($this->_next_update['$unset'][$field]))
 			{
@@ -157,6 +158,8 @@ class Mundo_Object_Core
 
 			// This must be a $set
 			$this->_next_update['$set'] = array_merge($this->_next_update['$set'], array($field => $value));
+			 */
+
 		}
 
 		return $this;
