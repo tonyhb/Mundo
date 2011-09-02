@@ -237,10 +237,12 @@ class Mundo_Object_Core
 	}
 
 	/**
-	 * Helper function for the atomic operation $inc
+	 * Helper method for the atomic operation $inc
 	 *
-	 * This function passes all logic thanks to set() and only checks that
+	 * This method passes all logic thanks to set() and checks that
 	 * the current operation uses numeric values.
+	 *
+	 * This method
 	 *
 	 * @param  mixed    field name or array of field => values
 	 * @param  numeric  amount to increase or decrease by
@@ -256,7 +258,7 @@ class Mundo_Object_Core
 
 		$values = Mundo::flatten($values);
 
-		foreach($values as $field => $value)
+		foreach($values as $field => &$value)
 		{
 			if ( ! is_numeric($this->original($field)) AND $this->original($field) !== NULL)
 			{
@@ -269,6 +271,9 @@ class Mundo_Object_Core
 				// Can only apply $inc modifier with numeric values
 				throw new Mundo_Exception('Cannot apply $inc modifier with non-numeric values in field \':field\'', array(':field' => $field));
 			}
+
+			// Add $value onto $changed
+			$value += $this->get($field);
 		}
 
 		$this->set($values);
@@ -646,6 +651,44 @@ class Mundo_Object_Core
 		if ( ! $this->changed())
 			return $this;
 
+		$this->_init_db();
+
+		// Remove unnecessary atomic modifiers
+		$update = Mundo::flatten($this->_next_update);
+		$update = array_filter($update);
+		$update = Mundo::inflate($update);
+
+		// Update using our $id
+		$this->_collection->update(array('_id' => $this->get('_id')), $update);
+
+		// Get our original data so we can merge changes
+		$data = $this->original();
+
+		// Flatten our changed data for set_path calls
+		$changed = Mundo::flatten($this->changed());
+
+		// For each piece of changed data merge it in.
+		foreach($changed as $field => $value)
+		{
+			Arr::set_path($data, $field, $value);
+		}
+
+		// Reset our changed array
+		$this->_changed = array();
+
+		// Copy the next update into last update
+		$this->_last_update = $update;
+
+		// Reset the update variable
+		$this->_reset_update();
+
+		// Replace our data just in case an upsert created an ID
+		$this->_data = $data;
+
+		// Ensure we're loaded if that was an upsert
+		$this->_loaded = TRUE;
+
+		return $this;
 	}
 
 	/**

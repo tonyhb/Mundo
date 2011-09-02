@@ -695,6 +695,8 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @test
 	 * @covers Mundo_Object::inc
 	 * @covers Mundo_Object::set
+	 * @covers Mundo_Object::update
+	 * @covers Mundo_Object::last_update
 	 * @return void
 	 */
 	public function test_inc_atomicity()
@@ -729,7 +731,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 
 		// Test overwriting a saved $inc uses saved $original data for calctulations
 
-		$document->set(array(
+		$data = array(
 			'post_title' => 4,
 			'post_slug' => 'post-slug',
 			'post_date' => new MongoDate,
@@ -748,7 +750,9 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 					'author_email' => 'comment.2@example.com',
 				)
 			)
-		));
+		);
+
+		$document->set($data);
 
 		$document->save();
 
@@ -777,10 +781,35 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		/**
 		 * Test the inc method
 		 */
+		$data = array(
+			'post_title' => 4,
+			'post_slug' => 'post-slug',
+			'post_date' => new MongoDate,
+			'author' => new MongoId,
+			'author_name' => 'Author Name',
+			'author_email' => 'email@example.com',
+			'post_content' => 'Content',
+			'post_metadata' => array(
+				'keywords' => 'keyword one',
+				'description' => 'keyword two',
+			),
+			'comments' => array(
+				array(
+					'comment' => 'Comment 2',
+					'author_name' => 'Comment author',
+					'author_email' => 'comment.2@example.com',
+				)
+			)
+		);
+
+		$document->set($data);
+
+		$document->save();
+
 		$document->inc('post_title', 5);
 
 		$modifiers['$inc'] = array(
-			'post_title' => 1
+			'post_title' => 5
 		);
 
 		$this->assertEquals(
@@ -788,15 +817,74 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 			$document->next_update()
 		);
 
+		// Inc increments by $value, so ensure it is original + inc
+		$this->assertEquals(
+			9,
+			$document->get('post_title')
+		);
+
+		// This increments on top of the new value too
 		$document->inc('post_title', 6);
 
 		$modifiers['$inc'] = array(
-			'post_title' => 2
+			'post_title' => 11
+		);
+
+		$update = $document->next_update();
+		$this->assertEquals(
+			$modifiers,
+			$update
+		);
+
+		// Inc increments by $value, so ensure it is original + inc
+		$this->assertEquals(
+			15,
+			$document->get('post_title')
+		);
+
+		/**
+		 * Test updating from inc modifier
+		 */
+		$document->update();
+
+		$this->assertEmpty($document->changed());
+
+		$this->assertEquals(
+			self::$empty_update,
+			$document->next_update()
+		);
+
+		// Ensure the update method saved the query array
+		$this->assertEquals(
+			array(
+				'$inc' => array(
+					'post_title' => 11
+				)
+			), 
+			$document->last_update()
+		);
+
+		// Load a copy of the saved document to confirm changes
+		$loaded_doc = new Model_Blogpost;
+		$loaded_doc->_id = $document->_id;
+
+		$loaded_data = $loaded_doc->load()->get();
+		$doc_data = $document->get();
+
+		// Remove IDs because they dont compare
+		unset($loaded_data['_id']);
+		unset($doc_data['_id']);
+
+		// Ensure the data representing the mongo db is saved
+		$data['post_title'] = 15;
+		$this->assertEquals(
+			$data,
+			$doc_data
 		);
 
 		$this->assertEquals(
-			$modifiers,
-			$document->next_update()
+			$loaded_data,
+			$doc_data
 		);
 	}
 
@@ -1311,6 +1399,20 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		'$set' => array(),
 		'$unset' => array(),
 	);
+
+	protected function reset_update()
+	{
+		self::$empty_update = array(
+			'$pushAll' => array(), // This takes care of $push
+			'$pullAll' => array(), // This takes care of $pull
+			'$addToSet' => array(),
+			'$pop' => array(),
+			'$bit' => array(),
+			'$inc' => array(),
+			'$set' => array(),
+			'$unset' => array(),
+		);
+	}
 
 	/**
 	 * Tests the push() method, which replaces array_push on model data
