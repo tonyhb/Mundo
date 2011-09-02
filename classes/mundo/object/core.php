@@ -101,7 +101,8 @@ class Mundo_Object_Core
 	 * Assigns field data by name. Assigned variables will first be added to
 	 * the $_changed variable until the collection has been updated.
 	 *
-	 * @todo Allow setting of data through dot path notation (eg. comment.author)
+	 * This also handles the following positional modifier updates:
+	 *   $set, $unset, $inc
 	 *
 	 * @param  mixed  field name or an array of field => values 
 	 * @param  mixed  field value 
@@ -109,7 +110,7 @@ class Mundo_Object_Core
 	 */
 	public function set($values, $value = NULL)
 	{
-		if ($value)
+		if ($value OR ! is_array($values))
 		{
 			// Normalise single field setting to multiple field setting
 			$values = array($values => $value);
@@ -123,17 +124,39 @@ class Mundo_Object_Core
 
 		foreach ($values as $field => $value)
 		{
-			// Replace numerical keys with mongo's positional operator
-			$field_positional = preg_replace('#\.[0-9]+#', '.$', $field);
+			if ($value === NULL)
+			{
+				// Call the unset method
+				$this->unset_atomic($field);
+				continue;
+			}
 
-			// $field_positional needs to be the whole array path or at least the first portion
-			if ( ! in_array($field_positional, $this->_fields) AND ! preg_grep('/^'.str_replace(array('$', '.'), array('\$', '\.'), $field_positional).'/', $this->_fields))
+			// Check the field exists
+			if ( ! $this->_check_field_exists($field))
 			{
 				throw new Mundo_Exception("Field ':field' does not exist", array(':field' => $field));
 			}
 
 			// Set our data
 			Arr::set_path($this->_changed, $field, $value);
+
+			// Make sure the $unset operation isn't set
+			if (isset($this->_next_update['$unset'][$field]))
+			{
+				unset($this->_next_update['$unset'][$field]);
+			}
+
+			if (is_numeric($value) AND (is_numeric($this->original($field)) OR $this->original($field) === NULL))
+			{
+				// Work out difference for incrementing
+				$difference = $value - $this->original($field);
+				$this->_next_update['$inc'] = array_merge($this->_next_update['$inc'], array($field => $difference));
+				continue;
+			}
+
+			// This must be a $set
+			$this->_next_update['$set'] = array_merge($this->_next_update['$set'], array($field => $value));
+
 		}
 
 		return $this;
@@ -152,6 +175,113 @@ class Mundo_Object_Core
 	{
 		$this->set($field, $value);
 	}
+
+	/**
+	 * Unsets $field data.
+	 *
+	 * This function sets the field data in $_changed to NULL and adds the
+	 * $unset atomic operation.
+	 * 
+	 * It does NOT remove the field from $_changed, otherwise the save
+	 * method will save old data.
+	 *
+	 * Note that this has atomic_ suffix because there's already a function
+	 * called unset. Of course.
+	 *
+	 * @param  string  Field name to set, in dot notation form
+	 * @return $this
+	 */
+	public function unset_atomic($field)
+	{
+		// If there isn't any original data or changed data set, return
+		if ( ! $this->original($field) AND ! $this->changed($field))
+			return $this;
+
+		// Set the changed data to null
+		Arr::set_path($this->_changed, $field, NULL);
+
+		// Flatten the update array so we can check this doens't exist elsewhere
+		$next_update = Mundo::flatten($this->_next_update);
+
+		$preg_field = str_replace('.', '\.', $field);
+
+		// Check the flattened update array to see that there are no other atomic operations for this field
+		$key = preg_grep('#^\$[a-zA-Z]+\.'.$preg_field.'#', array_keys($next_update));
+
+		if ( ! empty($key))
+		{
+			// Get the first key
+			$key = array_shift($key);
+
+			// Remove the atomic operation from the flat update array
+			unset($next_update[$key]);
+		}
+
+		// Inflate the array ready for replacement
+		$next_update = Mundo::inflate($next_update);
+
+		// Unsetting the last operation for an atomic operator removes it completely
+		$this->_reset_update();
+
+		// So merge the empty (reset) next update with the updated one
+		$this->_next_update = array_merge($this->_next_update, $next_update);
+
+		// Removing the previous atomic operation may have been enough, but if the original exists unset the data
+		if ($this->original($field) !== NULL)
+		{
+			// We don't need to array merge because the value will always be 1
+			$this->_next_update['$unset'] += array($field => 1);
+		}
+
+		return $this;
+	}
+
+	/**
+	 * Helper method for the atomic operation $inc
+	 *
+	 * This method passes all logic thanks to set() and checks that
+	 * the current operation uses numeric values.
+	 *
+	 * This method
+	 *
+	 * @param  mixed    field name or array of field => values
+	 * @param  numeric  amount to increase or decrease by
+	 * @return void
+	 */
+	public function inc($values, $value)
+	{
+		if ($value)
+		{
+			// Normalise single field setting to multiple field setting
+			$values = array($values => $value);
+		}
+
+		$values = Mundo::flatten($values);
+
+		foreach($values as $field => &$value)
+		{
+			if ( ! is_numeric($this->original($field)) AND $this->original($field) !== NULL)
+			{
+				// Non-numeric, cant $inc
+				throw new Mundo_Exception('Cannot apply $inc modifier to non-number in field \':field\'', array(':field' => $field));
+			}
+
+			if ( ! is_numeric($value))
+			{
+				// Can only apply $inc modifier with numeric values
+				throw new Mundo_Exception('Cannot apply $inc modifier with non-numeric values in field \':field\'', array(':field' => $field));
+			}
+
+			// Add $value onto $changed
+			$value += $this->get($field);
+		}
+
+		$this->set($values);
+
+		return $this;
+	}
+
+
 
 	/**
 	 * Allow retrieving field values via overloading.
@@ -186,44 +316,7 @@ class Mundo_Object_Core
 	 */
 	public function __unset($field)
 	{
-		// If there isn't any original data or changed data set, return
-		if ( ! $this->original($field) AND ! $this->changed($field))
-			return;
-
-		// If the field has been changed and there is no original data, we need to remove it from our changed array
-		$changed = $this->changed($field) AND ! $this->original($field);
-
-		// Set our $field to NULL
-		$this->set(array($field => NULL));
-
-		if ($changed)
-		{
-			if (strpos($field, '.') !== FALSE)
-			{
-				// We're using dot notation to unset an embedded object, so separate our path string.
-				$paths = explode('.', $field);
-
-				// Pop the field name we are unsetting (the last element)
-				$field = array_pop($paths);
-
-				// Take the remaining keys as our parent path and array path
-				$field_path = implode('.', $paths);
-
-				// Get the embedded object we are removing values from 
-				$changed = Arr::path($this->_changed, $field_path);
-
-				// Unset our data from the embedded object
-				unset($changed[$field]);
-
-				// Reset our altered embedded object
-				Arr::set_path($this->_changed, $field_path, $changed);
-			}
-			else
-			{
-				// Simple document field, just unset it
-				unset($this->_changed[$field]);
-			}
-		}
+		$this->unset_atomic($field);
 	}
 
 	/**
@@ -237,10 +330,29 @@ class Mundo_Object_Core
 	{
 		if ( ! $path)
 		{
-			return $this->_merge(); 
+			// Flatten data so we can remove any NULL elements
+			$data = Mundo::flatten($this->_merge());
+
+			// Remove empty fields
+			$data = array_filter($data);
+
+			// Return purged data
+			return (empty($data)) ? NULL : Mundo::inflate($data);
 		}
 
-		return Arr::path($this->_merge(), $path);
+		$data = Arr::path($this->_merge(), $path);
+
+		// If it's not an array return it
+		if ( ! is_array($data))
+			return $data;
+
+		// Flatten the data
+		$data = Mundo::flatten($data); 
+
+		// Remove empty fields
+		$data = array_filter($data);
+
+		return Mundo::inflate($data);
 	}
 
 	/**
@@ -253,7 +365,7 @@ class Mundo_Object_Core
 	{
 		if ( ! $path)
 		{
-			return $this->_changed; 
+			return $this->_changed;
 		}
 
 		return Arr::path($this->_changed, $path);
@@ -464,6 +576,9 @@ class Mundo_Object_Core
 		// Reset our $_changed to empty after our save
 		$this->_changed = array();
 
+		// Reset the update variable
+		$this->_reset_update();
+
 		// Update our saved data variable
 		$this->_data = $data;
 
@@ -506,6 +621,9 @@ class Mundo_Object_Core
 		// Reset our changed array
 		$this->_changed = array();
 
+		// Reset the update variable
+		$this->_reset_update();
+
 		// Replace our data just in case an upsert created an ID
 		$this->_data = $data;
 
@@ -519,7 +637,7 @@ class Mundo_Object_Core
 	 * Atomically updates the document according to data in the changed
 	 * property.
 	 *
-	 * @returns $this
+	 * @returns bool whether the update was successful or not
 	 */
 	public function update()
 	{
@@ -533,20 +651,151 @@ class Mundo_Object_Core
 		if ( ! $this->changed())
 			return $this;
 
-		// Initialise an empty driver query
-		$query = array();
+		$this->_init_db();
 
-		// Take our changed and original and flatten them for comparison
+		// Put our modifier query into a variable
+		$update = $this->next_update();
+
+		// Update using our $id
+		$status = $this->_collection->update(array('_id' => $this->get('_id')), $update, array('safe' => $this->_safe));
+
+		// Get our original data so we can merge changes
+		$data = $this->original();
+
+		// Flatten our changed data for set_path calls
 		$changed = Mundo::flatten($this->changed());
-		$original = Mundo::flatten($this->original());
 
-		echo Debug::vars($changed, $original);
-
-		foreach ($changed as $field => $value)
+		// For each piece of changed data merge it in.
+		foreach($changed as $field => $value)
 		{
+			Arr::set_path($data, $field, $value);
 		}
+
+		// Reset our changed array
+		$this->_changed = array();
+
+		// Copy the next update into last update
+		$this->_last_update = $update;
+
+		// Reset the update variable
+		$this->_reset_update();
+
+		// Replace our data just in case an upsert created an ID
+		$this->_data = $data;
+
+		// Ensure we're loaded if that was an upsert
+		$this->_loaded = TRUE;
+
+		return $status;
 	}
 
+	/**
+	 * Pushes $data onto the end of an array. This replaces array_push
+	 * because of overloaded properties, and accepts the same arguments
+	 * as array_push
+	 *
+	 * @param  $field  the field we are pushing data onto
+	 * @param  $data1, $data2... Data to push onto the end of this array
+	 * @return int     the total number of elements in the array
+	 **/
+	public function push()
+	{
+		// Get the function arguments
+		$args = func_get_args();
+
+		// Shift the field name from the data to append
+		$field = array_shift($args);
+
+		if ( ! $this->_check_field_exists($field))
+		{
+			// Fail because there's nothing to modify
+			throw new Mundo_Exception("Field ':field' does not exist", array(':field' => $field));
+		}
+
+		// Find out how many embedded collections are in $field (this will give us the next array key too)
+		$count = count($this->get($field));
+
+		// Loop through each piece of data to push onto the $field
+		foreach($args as $data)
+		{
+			$this->_changed[$field][$count] = $data;
+			$count++;
+		}
+
+		if (isset($this->_next_update['$pushAll'][$field]))
+		{
+			// Add the data to the $pushAll
+			$this->_next_update['$pushAll'][$field] = array_merge($this->_next_update['$pushAll'][$field], $args);
+		}
+		else
+		{
+			$this->_next_update['$pushAll'][$field] = $args;
+		}
+
+		return $count;
+	}
+
+	/**
+	 * Removes the last element in the array $field and returns it.
+	 *
+	 * @param  $field  the field we are popping
+	 * @return mixed   popped data 
+	 */
+	public function pop($field)
+	{
+		// Get the most recent model data
+		$data = $this->get($field);
+
+		if ( ! is_array($data))
+		{
+			// We can only pop arrays
+			throw new Mundo_Exception("Field ':field' is not an array", array(':field' => $field));
+		}
+
+		// Find the last key we're modifying
+		$count = count($data) - 1;
+
+		// Is this a variable that has been pushed and hasn't been written to the database?
+		if (isset($this->_changed[$field][$count]) AND isset($this->_next_update['$pushAll'][$field]))
+		{
+			// If so, stop it from being added in $pushAll
+			array_pop($this->_next_update['$pushAll'][$field]);
+
+			// If that was the only atomic update for the $field...
+			if (empty($this->_next_update['$pushAll'][$field]))
+			{
+				// Remove the $field completely
+				unset($this->_next_update['$pushAll'][$field]);
+			}
+		}
+		else
+		{
+			// Add this to $_next_update
+			$this->_next_update['$pop'] += array($field => 1);
+		}
+
+		// Set the last element of the array to null so it overwrites data in get()
+		$this->_changed[$field][$count] = NULL;
+
+		// Return the element we just set to null from $data
+		return $data[$count];
+	}
+
+	/**
+	 * Helper function which takes a field name and checks if it has been
+	 * defined in the model
+	 *
+	 * @param $field  string  field name
+	 * @return bool
+	 */
+	protected function _check_field_exists($field)
+	{
+		// Replace any positional modifier keys with '$'
+		$field = preg_replace('#\.[0-9]+#', '.$', $field);
+
+		// If the field exists or it is the parent of an embedded collection return true
+		return (in_array($field, $this->_fields) OR preg_grep('/^'.str_replace(array('$', '.'), array('\$', '\.'), $field).'\./', $this->_fields));
+	}
 
 	/**
 	 * Stores an array containing the last update() query sent to the driver
@@ -557,6 +806,59 @@ class Mundo_Object_Core
 	protected $_last_update;
 
 	/**
+	 * An array which contains the next atomical update to save $_changed
+	 * data in the collection. We organise all array fields so we don't
+	 * have to check if they exists to add to them when changing data.
+	 *
+	 * @var array
+	 */
+	protected $_next_update = array(
+			'$pushAll' => array(), // This takes care of $push
+			'$pullAll' => array(), // This takes care of $pull
+			'$addToSet' => array(),
+			'$pop' => array(),
+			'$bit' => array(),
+			'$inc' => array(),
+			'$set' => array(),
+			'$unset' => array(),
+		);
+
+	/**
+	 * Returns the query used to atomically update currently changed data
+	 *
+	 * @param  string  Atomic operator to return. Will return all atomic 
+	 *                 operations by default
+	 * @return array
+	 */
+	public function next_update($operator = NULL)
+	{
+		if ($operator === NULL)
+		{
+			// Intialise our return array
+			$update = array();
+
+			// Loop through each modifier and remove the empty ones
+			foreach($this->_next_update as $modifier => $data)
+			{
+				if ( ! empty($data))
+				{
+					$update[$modifier] = $data;
+				}
+			}
+
+			return $update;
+		}
+
+		if ( ! array_key_exists($operator, $this->_next_update))
+		{
+			throw new Mundo_Exception("The atomic operation ':operation' does not exist", array(':operation' => $operator));
+		}
+
+		return $this->_next_update[$operator];
+
+	}
+
+	/**
 	 * Displays the last atomic operation as it would have been sent to the
 	 * Mongo PHP driver
 	 *
@@ -565,6 +867,25 @@ class Mundo_Object_Core
 	public function last_update()
 	{
 		return $this->_last_update;
+	}
+
+	/**
+	 * Resets the $_next_update protected variable
+	 *
+	 * @return void;
+	 */
+	protected function _reset_update()
+	{
+		$this->_next_update = array(
+			'$pushAll' => array(),
+			'$pullAll' => array(),
+			'$addToSet' => array(),
+			'$pop' => array(),
+			'$bit' => array(),
+			'$inc' => array(),
+			'$set' => array(),
+			'$unset' => array(),
+		);
 	}
 
 	/**

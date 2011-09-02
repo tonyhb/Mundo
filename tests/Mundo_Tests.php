@@ -73,6 +73,70 @@ class MundoTests extends PHPUnit_Framework_TestCase
 			// $field_data, $check_result, $expected_errors
 			array(
 				array(
+					'$pushAll' => array(), // This takes care of $push
+					'$pullAll' => array(), // This takes care of $pull
+					'$addToSet' => array(),
+					'$pop' => array(),
+					'$bit' => array(),
+					'$inc' => array(),
+					'$set' => array(),
+					'$unset' => array(),
+				),
+				array(
+					'$pushAll' => array(), // This takes care of $push
+					'$pullAll' => array(), // This takes care of $pull
+					'$addToSet' => array(),
+					'$pop' => array(),
+					'$bit' => array(),
+					'$inc' => array(),
+					'$set' => array(),
+					'$unset' => array(),
+				),
+				FALSE,
+			),
+			array(
+				array(
+					'$pushAll' => array(
+						"comments" => array(
+							array(
+								"comment" => "Comment number 2",
+								"author_name" => "Commenter Brown",
+								"author_email" => "commenter.brown@example.com",
+							),
+							array(
+								"author_name" => "Commenter Smith",
+								"author_email" => "commenter.smith@example.com"
+							),
+						),
+					), // This takes care of $push
+					'$pullAll' => array(),
+					'$addToSet' => array(),
+					'$pop' => array(),
+					'$bit' => array(),
+					'$inc' => array(),
+					'$set' => array(
+						'post_title' => 'New post title',
+					),
+					'$unset' => array(),
+				),
+				array(
+					'$pushAll.comments.0.comment' => 'Comment number 2',
+					'$pushAll.comments.0.author_name' => 'Commenter Brown',
+					'$pushAll.comments.0.author_email' => 'commenter.brown@example.com',
+					'$pushAll.comments.1.author_name' => 'Commenter Smith',
+					'$pushAll.comments.1.author_email' => 'commenter.smith@example.com',
+					'$pullAll' => array(), // This takes care of $pull
+					'$addToSet' => array(),
+					'$pop' => array(),
+					'$bit' => array(),
+					'$inc' => array(),
+					'$set.post_title' => 'New post title',
+					'$unset' => array(),
+				),
+				FALSE,
+			),
+			array(
+				array(
 					'_id'           => new MongoId('4d9b16c8ef966fff00000006'),
 					'post_title'    => 'Blog post inserted from ID',
 					'post_slug'     => 'blog-post-from-id',
@@ -99,6 +163,24 @@ class MundoTests extends PHPUnit_Framework_TestCase
 					'post_content'  => 'Blog post content here.',
 					'post_metadata.keywords'    => 'specific id, mongoid',
 					'post_metadata.description' => 'Description tag here',
+				)
+			),
+			array(
+				array(
+					array(
+						'title' => 'title',
+						'content' => 'content',
+						'post_metadata' => array(
+							'keywords'    => 'specific id, mongoid',
+							'description' => 'Description tag here',
+						),
+					),
+				),
+				array(
+					'0.title' => 'title',
+					'0.content' => 'content',
+					'0.post_metadata.keywords' => 'specific id, mongoid',
+					'0.post_metadata.description' => 'Description tag here',
 				)
 			),
 			array(

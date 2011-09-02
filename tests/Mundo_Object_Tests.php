@@ -40,13 +40,14 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		self::setUpBeforeClass();
 	}
 
+
 	/**
 	 * Provides test data for test_set_and_get
 	 *
 	 */
 	public static function provider_set_and_get()
 	{
-		// $data, $expected_error (null if it should succeed)
+		// $data, $expected_error (null if it should succeed), $expected_result (with dot notation)
 		return array(
 			// A full dataset
 			array(
@@ -203,6 +204,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @covers Mundo_Object::set
 	 * @covers Mundo_Object::get
 	 * @covers Mundo_Object::changed
+	 * @covers Mundo_Object::_check_field_exists
 	 * @dataProvider provider_set_and_get
 	 * @param  array  $data             The array of data to set
 	 * @param  mixed  $expected_error   Null if setting should pass, otherwise the error exception message.
@@ -244,6 +246,14 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 				$this->assertSame($Mundo->get(), $data);
 				$this->assertSame($Mundo->changed(), $data);
 			}
+
+
+			// Ensure the atomic operators got updated
+			$modifiers = array('$set' => array());
+			$flat_data = Mundo::flatten($data);
+			$modifiers['$set'] += $flat_data;
+
+			$this->assertEquals($modifiers, $Mundo->next_update());
 		}
 	}
 
@@ -257,6 +267,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @covers Mundo_Object::__get
 	 * @covers Mundo_Object::__isset
 	 * @covers Mundo_Object::changed
+	 * @covers Mundo_Object::_check_field_exists
 	 * @dataProvider provider_set_and_get
 	 * @param   string  $data 
 	 * @param   string  $expected_error 
@@ -389,6 +400,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @test
 	 * @covers Mundo_Object::get
 	 * @covers Mundo_Object::set
+	 * @covers Mundo_Object::_check_field_exists
 	 * @covers Mundo_Object::changed
 	 * @dataProvider provider_single_set_and_get
 	 * @param  string  $field            Name of field we are setting
@@ -678,6 +690,303 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	}
 
 	/**
+	 * Tests the inc set methods atomicity with the $inc modifier
+	 *
+	 * @test
+	 * @covers Mundo_Object::inc
+	 * @covers Mundo_Object::set
+	 * @covers Mundo_Object::update
+	 * @covers Mundo_Object::last_update
+	 * @return void
+	 */
+	public function test_inc_atomicity()
+	{
+		$document = new Model_Blogpost;
+
+		$document->set('post_title', 4);
+
+		$modifiers = array();
+
+		$modifiers['$inc'] = array(
+			'post_title' => 4
+		);
+			
+		$this->assertEquals(
+			$modifiers,
+			$document->next_update()
+		);
+
+		// Ensure that overwriting a non-saved $inc uses $original data for calculations
+
+		$document->set('post_title', 8);
+
+		$modifiers['$inc'] = array(
+			'post_title' => 8
+		);
+
+		$this->assertEquals(
+			$modifiers,
+			$document->next_update()
+		);
+
+		// Test overwriting a saved $inc uses saved $original data for calctulations
+
+		$data = array(
+			'post_title' => 4,
+			'post_slug' => 'post-slug',
+			'post_date' => new MongoDate,
+			'author' => new MongoId,
+			'author_name' => 'Author Name',
+			'author_email' => 'email@example.com',
+			'post_content' => 'Content',
+			'post_metadata' => array(
+				'keywords' => 'keyword one',
+				'description' => 'keyword two',
+			),
+			'comments' => array(
+				array(
+					'comment' => 'Comment 2',
+					'author_name' => 'Comment author',
+					'author_email' => 'comment.2@example.com',
+				)
+			)
+		);
+
+		$document->set($data);
+
+		$document->save();
+
+		$document->post_title = 5;
+
+		$modifiers['$inc'] = array(
+			'post_title' => 1
+		);
+
+		$this->assertEquals(
+			$modifiers,
+			$document->next_update()
+		);
+
+		$document->post_title = 6;
+
+		$modifiers['$inc'] = array(
+			'post_title' => 2
+		);
+
+		$this->assertEquals(
+			$modifiers,
+			$document->next_update()
+		);
+
+		/**
+		 * Test the inc method
+		 */
+		$data = array(
+			'post_title' => 4,
+			'post_slug' => 'post-slug',
+			'post_date' => new MongoDate,
+			'author' => new MongoId,
+			'author_name' => 'Author Name',
+			'author_email' => 'email@example.com',
+			'post_content' => 'Content',
+			'post_metadata' => array(
+				'keywords' => 'keyword one',
+				'description' => 'keyword two',
+			),
+			'comments' => array(
+				array(
+					'comment' => 'Comment 2',
+					'author_name' => 'Comment author',
+					'author_email' => 'comment.2@example.com',
+				)
+			)
+		);
+
+		$document->set($data);
+
+		$document->save();
+
+		$document->inc('post_title', 5);
+
+		$modifiers['$inc'] = array(
+			'post_title' => 5
+		);
+
+		$this->assertEquals(
+			$modifiers,
+			$document->next_update()
+		);
+
+		// Inc increments by $value, so ensure it is original + inc
+		$this->assertEquals(
+			9,
+			$document->get('post_title')
+		);
+
+		// This increments on top of the new value too
+		$document->inc('post_title', 6);
+
+		$modifiers['$inc'] = array(
+			'post_title' => 11
+		);
+
+		$update = $document->next_update();
+		$this->assertEquals(
+			$modifiers,
+			$update
+		);
+
+		// Inc increments by $value, so ensure it is original + inc
+		$this->assertEquals(
+			15,
+			$document->get('post_title')
+		);
+
+		/**
+		 * Test updating from inc modifier
+		 */
+		$document->update();
+
+		$this->assertEmpty($document->changed());
+
+		$this->assertEquals(
+			array(),
+			$document->next_update()
+		);
+
+		// Ensure the update method saved the query array
+		$this->assertEquals(
+			array(
+				'$inc' => array(
+					'post_title' => 11
+				)
+			), 
+			$document->last_update()
+		);
+
+		// Load a copy of the saved document to confirm changes
+		$loaded_doc = new Model_Blogpost;
+		$loaded_doc->_id = $document->_id;
+
+		$loaded_data = $loaded_doc->load()->get();
+		$doc_data = $document->get();
+
+		// Remove IDs because they dont compare
+		unset($loaded_data['_id']);
+		unset($doc_data['_id']);
+
+		// Ensure the data representing the mongo db is saved
+		$data['post_title'] = 15;
+		$this->assertEquals(
+			$data,
+			$doc_data
+		);
+
+		$this->assertEquals(
+			$loaded_data,
+			$doc_data
+		);
+	}
+
+	/**
+	 * Ensures the inc method throws an error when called on a field
+	 * that has non-numeric saved data
+	 *
+	 * @test
+	 * @covers Mundo_Object::inc
+	 * @return void
+	 */
+	public function test_inc_throws_error_when_field_is_non_numeric()
+	{
+		$document = new Model_Blogpost;
+
+		$document->set(array(
+			'post_title' => 'Title',
+			'post_slug' => 'post-slug',
+			'post_date' => new MongoDate,
+			'author' => new MongoId,
+			'author_name' => 'Author Name',
+			'author_email' => 'email@example.com',
+			'post_content' => 'Content',
+			'post_metadata' => array(
+				'keywords' => 'keyword one',
+				'description' => 'keyword two',
+			),
+			'comments' => array(
+				array(
+					'comment' => 'Comment 2',
+					'author_name' => 'Comment author',
+					'author_email' => 'comment.2@example.com',
+				)
+			)
+		));
+
+		$document->save();
+
+		try
+		{
+			$document->inc('post_title', 5);
+		}
+		catch(Mundo_Exception $e)
+		{
+			$this->assertSame($e->getMessage(), "Cannot apply \$inc modifier to non-number in field 'post_title'");
+			return;
+		}
+
+		$this->fail("The inc() method should have raised an exception when called upon a non-numeric field");
+	}
+
+
+
+	/**
+	 * Ensures the inc method throws an error when called with a
+	 * non-numeric value
+	 *
+	 * @test
+	 * @covers Mundo_Object::inc
+	 * @return void
+	 */
+	public function test_inc_throws_error_when_value_is_non_numeric()
+	{
+		$document = new Model_Blogpost;
+
+		$document->set(array(
+			'post_title' => 5,
+			'post_slug' => 'post-slug',
+			'post_date' => new MongoDate,
+			'author' => new MongoId,
+			'author_name' => 'Author Name',
+			'author_email' => 'email@example.com',
+			'post_content' => 'Content',
+			'post_metadata' => array(
+				'keywords' => 'keyword one',
+				'description' => 'keyword two',
+			),
+			'comments' => array(
+				array(
+					'comment' => 'Comment 2',
+					'author_name' => 'Comment author',
+					'author_email' => 'comment.2@example.com',
+				)
+			)
+		));
+
+		$document->save();
+
+		try
+		{
+			$document->inc('post_title', 'hello');
+		}
+		catch(Mundo_Exception $e)
+		{
+			$this->assertSame($e->getMessage(), "Cannot apply \$inc modifier with non-numeric values in field 'post_title'");
+			return;
+		}
+
+		$this->fail("The inc() method should have raised an exception when called upon a non-numeric field");
+	}
+
+	/**
 	 * Check that the create() method adds documents to our collection, adds
 	 * the ObjectId to our $_data and throws validation exceptions if data
 	 * does not pass the validation check.
@@ -812,20 +1121,24 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		$this->assertInstanceOf('MongoId', $document->get('_id'));
 		$this->assertEmpty($document->changed());
 
-		foreach($data as $field => $value)
+		$fields = $document->get();
+		foreach($fields as $field => $value)
 		{
 			// Unset our already saved data
 			unset($document->$field);
 
 			$this->assertNull($document->changed($field));
-			$this->assertEquals($document->original($field), $data[$field]);
+			$this->assertEquals($document->original($field), $fields[$field]);
 		}
 
-		// Ensure that our array keys for the unset fields exist in changed
-		$changed_keys = array_keys($document->changed());
-		$data_keys = array_keys($data);
+		// Ensure that get() returns NULL because everything is unset
+		$this->assertEquals(NULL, $document->get());
 
-		$this->assertEquals($changed_keys, $data_keys);
+		// Assert that all of the keys now hold NULL
+		foreach($document->changed() as $value)
+		{
+			$this->assertNull($value);
+		}
 	}
 
 	/**
@@ -884,14 +1197,715 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * Tests how the load() method handles loading with no data
 	 *
 	 * @covers Mundo_Object::load
-	 * @expectedException Mundo_Exception
-	 * @expectedExceptionMessage No model data supplied
+	 * @expectedException Mundo_exception
+	 * @expectedexceptionmessage no model data supplied
 	 * @return void
 	 */
 	public function test_document_loading_with_no_data()
 	{
 		$document = new Model_Blogpost;
 		$document->load();
+	}
+
+	/**
+	 * Ensures Mundo_Object throws an error when trying to access
+	 * an atomic operation key in _next_update that doesn't exist
+	 *
+	 * @test
+	 * @covers Mundo_Object::next_update
+	 * @expectedException Mundo_exception
+	 * @expectedexceptionmessage The atomic operation '$nonExistantatomic' does not exist
+	 * @return void
+	 */
+	public function test_incorrect_atomic_operators_with_next_update()
+	{
+		$doc = new Model_Blogpost;
+		$doc->next_update('$nonExistantAtomic');
+	}
+
+	public function provider_push()
+	{
+		// $model_data, $multiple_push_arrays, $push_data, $expected_result, $atomic_operation, $save
+		return array(
+			array(
+				array(
+					'post_title' => 'Title',
+					'post_slug' => 'post-slug',
+					'post_date' => new MongoDate,
+					'author' => new MongoId,
+					'author_name' => 'Author Name',
+					'author_email' => 'email@example.com',
+					'post_content' => 'Content',
+					'post_metadata' => array(
+						'keywords' => 'keyword one',
+						'description' => 'keyword two',
+					),
+					'comments' => array(
+						array(
+							'comment' => 'Comment 2',
+							'author_name' => 'Comment author',
+							'author_email' => 'comment.2@example.com',
+						)
+					)
+				),
+				FALSE,
+				array(
+					'comment' => 'Comment 3'
+				),
+				array(
+					array(
+						'comment' => 'Comment 2',
+						'author_name' => 'Comment author',
+						'author_email' => 'comment.2@example.com',
+					),
+					array(
+						'comment' => 'Comment 3'
+					),
+				),
+				array(
+					'comments' => array(
+						array(
+							'comment' => 'Comment 3'
+						),
+					),
+				),
+				TRUE
+			),
+			array(
+				array(
+					'post_title' => 'Title',
+					'post_content' => 'Content',
+					'post_metadata' => array(
+						'keywords' => 'keyword one',
+						'description' => 'keyword two',
+					),
+					'comments' => array(
+						array(
+							'comment' => 'Comment 1',
+						)
+					)
+				),
+				TRUE,
+				array(
+					array(
+						'comment' => 'Comment 2'
+					),
+					array(
+						'comment' => 'Comment 3',
+						'author'  => '3rd comment author',
+					)
+				),
+				array(
+					array(
+						'comment' => 'Comment 1',
+					),
+					array(
+						'comment' => 'Comment 2'
+					),
+					array(
+						'comment' => 'Comment 3',
+						'author'  => '3rd comment author',
+					)
+				),
+				array(
+					'comments' => array(
+						array(
+							'comment' => 'Comment 2'
+						),
+						array(
+							'comment' => 'Comment 3',
+							'author'  => '3rd comment author',
+						)
+					),
+				),
+			),
+		);
+	}
+
+	/**
+	 * Tests the push() method, which replaces array_push on model data
+	 * These tests modify the comments field.
+	 *
+	 * @test
+	 * @covers Mundo_Object::push
+	 * @covers Mundo_Object::_check_field_exists
+	 * @covers Mundo_Object::next_update
+	 * @dataProvider provider_push
+	 *
+	 * @param $data initial data
+	 * @param $push data to push
+	 * @returns void
+	 */
+	public function test_push_with_unsaved_data($data, $multiple_push_arrays, $push_data, $expected_result, $atomic_operation)
+	{
+		// Duplicate data so we can run multiple pushes twice (the data is modified by array_push)
+		$var_data = $data;
+
+		// Initialise our model
+		$document = new Model_Blogpost($data);
+
+		if ($multiple_push_arrays)
+		{
+			// Call push with multiple arrays
+			$doc_count = call_user_func_array(array($document, "push"), array_merge(array('comments'), $push_data));
+			$var_count = call_user_func_array('array_push', array_merge(array(&$var_data['comments']), $push_data));
+		}
+		else
+		{
+			// Add data to the array
+			$doc_count = $document->push('comments', $push_data);
+			$var_count = array_push($var_data['comments'], $push_data);
+		}
+
+		// Ensure pushing the array had the expected results
+		$this->assertEquals($expected_result, $document->get('comments'));
+
+		// The model's push should work the same as the normal function
+		$this->assertEquals($var_data['comments'], $document->get('comments'));
+		$this->assertEquals($doc_count, $var_count);
+
+		// Ensure that the atomic query for this change was written
+		$this->assertEquals($atomic_operation, $document->next_update('$pushAll'));
+
+		// If there are multiple push arrays try setting them one at a time now.
+		if ( ! $multiple_push_arrays)
+			return;
+
+		$var_data = $data;
+
+		$document = new Model_Blogpost($data);
+
+		foreach($push_data as $push)
+		{
+			$doc_count = $document->push('comments', $push);
+			$var_count = array_push($var_data['comments'], $push);
+
+			// Make sure everything's OK each time
+			$this->assertEquals($doc_count, $var_count);
+			$this->assertEquals($var_data['comments'], $document->get('comments'));
+		}
+
+		$this->assertEquals($expected_result, $document->get('comments'));
+		$this->assertEquals($atomic_operation, $document->next_update('$pushAll'));
+	}
+
+	static $empty_update = array(
+		'$pushAll' => array(), // This takes care of $push
+		'$pullAll' => array(), // This takes care of $pull
+		'$addToSet' => array(),
+		'$pop' => array(),
+		'$bit' => array(),
+		'$inc' => array(),
+		'$set' => array(),
+		'$unset' => array(),
+	);
+
+	protected function reset_update()
+	{
+		self::$empty_update = array(
+			'$pushAll' => array(), // This takes care of $push
+			'$pullAll' => array(), // This takes care of $pull
+			'$addToSet' => array(),
+			'$pop' => array(),
+			'$bit' => array(),
+			'$inc' => array(),
+			'$set' => array(),
+			'$unset' => array(),
+		);
+	}
+
+	/**
+	 * Tests the push() method, which replaces array_push on model data
+	 * These tests modify the comments field.
+	 *
+	 * @test
+	 * @covers Mundo_Object::push
+	 * @covers Mundo_Object::_check_field_exists
+	 * @covers Mundo_Object::next_update
+	 * @covers Mundo_Object::_reset_update
+	 * @dataProvider provider_push
+	 *
+	 * @param $data initial data
+	 * @param $push data to push
+	 * @returns void
+	 */
+	public function test_push_with_saved_data($data, $multiple_push_arrays, $push_data, $expected_result, $atomic_operation, $save = FALSE)
+	{
+		if ( ! $save)
+			return;
+
+		// Duplicate data so we can run multiple pushes twice (the data is modified by array_push)
+		$var_data = $data;
+
+		// Initialise our model
+		$document = new Model_Blogpost($data);
+
+		if ($document->next_update() == array())
+		{
+			$this->fail('The update array should have been updated when setting $data');
+			return;
+		}
+
+		$document->save();
+
+		// Ensure saving resets our update array
+		$this->assertEquals($document->next_update(), array());
+
+		if ($multiple_push_arrays)
+		{
+			// Call push with multiple arrays
+			$doc_count = call_user_func_array(array($document, "push"), array_merge(array('comments'), $push_data));
+			$var_count = call_user_func_array('array_push', array_merge(array(&$var_data['comments']), $push_data));
+		}
+		else
+		{
+			// Add data to the array
+			$doc_count = $document->push('comments', $push_data);
+			$var_count = array_push($var_data['comments'], $push_data);
+		}
+
+		// Ensure pushing the array had the expected results
+		$this->assertEquals($expected_result, $document->get('comments'));
+
+		// The model's push should work the same as the normal function
+		$this->assertEquals($var_data['comments'], $document->get('comments'));
+		$this->assertEquals($doc_count, $var_count);
+
+		// Ensure that the atomic query for this change was written
+		$this->assertEquals($atomic_operation, $document->next_update('$pushAll'));
+
+		// If there are multiple push arrays try setting them one at a time now.
+		if ( ! $multiple_push_arrays)
+			return;
+
+		$var_data = $data;
+
+		$document = new Model_Blogpost($data);
+
+		foreach($push_data as $push)
+		{
+			$doc_count = $document->push('comments', $push);
+			$var_count = array_push($var_data['comments'], $push);
+
+			// Make sure everything's OK each time
+			$this->assertEquals($doc_count, $var_count);
+			$this->assertEquals($var_data['comments'], $document->get('comments'));
+		}
+
+		$this->assertEquals($expected_result, $document->get('comments'));
+		$this->assertEquals($atomic_operation, $document->next_update('$pushAll'));
+
+		/**
+		 * @todo SAVE
+		 */
+	}
+
+	/**
+	 *
+	 * @expectedException Mundo_Exception
+	 * @expectedExceptionMessage Field 'foo' does not exist
+	 *
+	 * @return void
+	 */
+	public function test_pushing_invalid_field_throws_error()
+	{
+		$document = new Model_Blogpost();
+		$document->push('foo', array('bar' => FALSE));
+	}
+
+	/**
+	 * Tests the pop() method
+	 *
+	 * @test
+	 * @covers Mundo_Object::pop
+	 */
+	public function test_pop_with_unsaved_data()
+	{
+		$data = array(
+			'post_title' => 'Title',
+			'post_content' => 'Content',
+			'post_metadata' => array(
+				'keywords' => 'keyword one',
+				'description' => 'keyword two',
+			),
+			'comments' => array(
+				array(
+					'comment' => 'Comment 1',
+				),
+				array(
+					'comment' => 'Comment 2',
+				),
+				array(
+					'comment' => 'Comment 3',
+				)
+			)
+		);
+
+		$document = new Model_Blogpost($data);
+
+
+		$doc_return = $document->pop('comments');
+		$var_return = array_pop($data['comments']);
+
+		$this->assertEquals($document->get('comments'), $data['comments']);
+		$this->assertEquals($doc_return, $var_return);
+
+		// Make sure that our atomic update is OK
+		$this->assertEquals(
+			$document->next_update('$pop'),
+			array(
+				'comments' => 1,
+			)
+		);
+
+		try
+		{
+			// Test that popping a non-array field
+			$document->pop('post_title');
+		}
+		catch(Mundo_Exception $e)
+		{
+				$this->assertEquals($e->getMessage(), "Field 'post_title' is not an array");
+				return;
+		}
+
+		$this->fail("Model should have thrown an exception when attempting to pop a non-array field");
+	}
+
+	/**
+	 * Test that running pop() after push() works correctly.
+	 * Pop() should set the array key to NULL and also remove the $pushAll
+	 * query in _next_update.
+	 *
+	 * @test
+	 * @covers Mundo_Object::push
+	 * @covers Mundo_Object::pop
+	 * @return void
+	 */
+	public function test_unsaved_push_then_pop_then_push_then_pop()
+	{
+		$data = array(
+			'post_title' => 'Title',
+			'post_content' => 'Content',
+			'post_metadata' => array(
+				'keywords' => 'keyword one',
+				'description' => 'keyword two',
+			),
+			'comments' => array(
+				array(
+					'comment' => 'Comment 1',
+				),
+				array(
+					'comment' => 'Comment 2',
+				),
+				array(
+					'comment' => 'Comment 3',
+				)
+			)
+		);
+
+		$document = new Model_Blogpost($data);
+
+		$document->push('comments',
+			array(
+				'comment' => 'Comment 4',
+			)
+		);
+
+		// Basic sanity checks on the push
+		$this->assertEquals(
+			$document->next_update('$pushAll'), 
+			array(
+				'comments' => array(
+					array(
+						'comment' => 'Comment 4',
+					)
+				)
+			)
+		);
+
+		$this->assertEquals(
+			$document->get('comments'), 
+			array_merge(
+				$data['comments'], 
+				array(
+					array('comment' => 'Comment 4')
+				)
+			)
+		);
+
+		$pop = $document->pop('comments');
+
+		// Ensure we got the just-pushed embedded collection
+		$this->assertEquals($pop, array('comment' => 'Comment 4'));
+
+		// Ensure that the next update doesn't contain anything in $pop and
+		// instead removed the $pushAll query
+		$this->assertEquals(
+			$document->next_update('$pushAll'),
+			array()
+		);
+		$this->assertEquals(
+			$document->next_update('$pop'),
+			array()
+		);
+
+		/** Now test running 2 pops and one pull leaves one in $pushAll */
+
+		// This also tests push() after pop()
+		$document->push('comments',
+			array(
+				'comment' => 'Comment 4',
+			),
+			array(
+				'comment' => 'Comment 5',
+			)
+		);
+
+		// Basic sanity checks on the push
+		$this->assertEquals(
+			$document->next_update('$pushAll'), 
+			array(
+				'comments' => array(
+					array(
+						'comment' => 'Comment 4',
+					),
+					array(
+						'comment' => 'Comment 5',
+					)
+				)
+			)
+		);
+
+		$this->assertEquals(
+			$document->get('comments'), 
+			array_merge(
+				$data['comments'], 
+				array(
+					array('comment' => 'Comment 4'),
+					array('comment' => 'Comment 5'),
+				)
+			)
+		);
+
+		$pop = $document->pop('comments');
+
+		// Ensure we got the just-pushed embedded collection
+		$this->assertEquals($pop, array('comment' => 'Comment 5'));
+		$this->assertEquals(count($document->get('comments')), 4);
+
+		// Ensure that the next update doesn't contain anything in $pop and
+		// instead removed the $pushAll query
+		$this->assertEquals(
+			$document->next_update('$pushAll'),
+			array(
+				'comments' => array(
+					array(
+						'comment' => 'Comment 4',
+					),
+				),
+			)
+		);
+		$this->assertEquals(
+			$document->next_update('$pop'),
+			array()
+		);
+
+		$pop = $document->pop('comments');
+
+		// Ensure we got the just-pushed embedded collection
+		$this->assertEquals($pop, array('comment' => 'Comment 4'));
+		$this->assertEquals(count($document->get('comments')), 3);
+
+		// Ensure that the next update doesn't contain anything in $pop and
+		// instead removed the $pushAll query
+		$this->assertEquals(
+			$document->next_update('$pushAll'),
+			array()
+		);
+		$this->assertEquals(
+			$document->next_update('$pop'),
+			array()
+		);
+
+	}
+
+
+	/**
+	 * Tests unset's atomicity
+	 * @test
+	 * @covers Mundo_Object::set
+	 * @covers Mundo_Object::__unset
+	 * @covers Mundo_Object::unset_atomic
+	 * @covers Mundo_Object::next_update
+	 * @covers Mundo_Object::_reset_update
+	 *
+	 * @param $data initial data
+	 * @param $push data to push
+	 * @returns void
+	 */
+	public function test_unset_atomicity()
+	{
+		/**
+		 * Basic set method testing. This tests:
+		 *   unset_atomic, __unset and calling unset_atomic from within set/__set
+		 *
+		 */
+		$document = new Model_Blogpost();
+		$document->post_title = 'Post title';
+
+		$this->assertEquals(
+			$document->next_update(),
+			array(
+				'$set' => array(
+					'post_title' => 'Post title',
+				),
+			)
+		);
+
+		$this->assertEmpty($document->original());
+
+		$this->assertEquals(
+			$document->changed(),
+			array(
+				'post_title' => 'Post title',
+			)
+		);
+
+		$document->unset_atomic('post_title');
+
+		$this->assertEquals(
+			$document->next_update(),
+			array()
+		);
+
+		$this->assertEquals(
+			$document->changed(),
+			array(
+				'post_title' => NULL,
+			)
+		);
+		// Test 1 (unset_atomic) domplete
+
+		$document->post_title = 'Post title';
+
+		unset($document->post_title);
+		$this->assertEquals(
+			$document->next_update(),
+			array()
+		);
+
+		$this->assertEquals(
+			$document->changed(),
+			array(
+				'post_title' => NULL,
+			)
+		);
+
+		$document->post_title = 'Post title';
+
+		// This should call unset in the set method
+		$document->post_title = NULL;
+
+		$this->assertEquals(
+			$document->next_update(),
+			array()
+		);
+
+		$this->assertEquals(
+			$document->changed(),
+			array(
+				'post_title' => NULL,
+			)
+		);
+
+		/**
+		 * Test how unset works with unsaved embedded collections
+		 */
+
+		$document->push(
+			'comments',
+			array(
+				'comment' => 'comment text',
+				'comment_author' => 'comment author',
+			)
+		);
+
+		$document->unset_atomic('comments.0.comment');
+
+		$this->assertEquals(
+			$document->next_update(),
+			array(
+				'$pushAll' => array(
+					'comments' => array(
+						array(
+							'comment_author' => 'comment author'
+						)
+					),
+				),
+			)
+		);
+
+		/**
+		 * Test how unset works with saved data
+		 */
+
+		$document->set(array(
+			'post_title' => 'Title',
+			'post_slug' => 'post-slug',
+			'post_date' => new MongoDate,
+			'author' => new MongoId,
+			'author_name' => 'Author Name',
+			'author_email' => 'email@example.com',
+			'post_content' => 'Content',
+			'post_metadata' => array(
+				'keywords' => 'keyword one',
+				'description' => 'keyword two',
+			),
+			'comments' => array(
+				array(
+					'comment' => 'Comment 2',
+					'author_name' => 'Comment author',
+					'author_email' => 'comment.2@example.com',
+				)
+			)
+		));
+
+		$document->save();
+
+		$this->assertEquals(
+			$document->next_update(),
+			array()
+		);
+
+		$document->unset_atomic('post_title');
+
+		$this->assertNull($document->get('post_title'));
+		$this->assertNull($document->changed('post_title'));
+
+		$this->assertEquals(
+			$document->next_update(),
+			array(
+				'$unset' => array(
+					'post_title' => 1
+				),
+			)	
+		);
+
+		/**
+		 * Test that re-setting data removes the $unset modifier
+		 */
+
+		$document->post_title = 'Post title';
+
+		$this->assertEquals(
+			array(
+				'$set' => array(
+					'post_title' => 'Post title',
+				),
+			),	
+			$document->next_update()
+		);
 	}
 
 	/**
@@ -996,14 +2010,21 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		}
 
 		// Merge our data for the assertions
-		$merged_data = array_merge(Mundo::flatten($data), Mundo::flatten($changed_data));
-		$merged_data = Mundo::inflate($merged_data);
+		$flattened_data = Mundo::flatten($document->get());
+		$flattened_changed = Mundo::flatten($changed_data);
 
-		// And as this data had already been inserted by a previous test, we need to add the ID
-		$merged_data += array('_id' => $document->get('_id'));
+		foreach($flattened_data as $field => $value)
+		{
+			// Merge our arrays like this so the NULL mimicing unset takes effect
+			if (array_key_exists($field, $flattened_changed))
+				$flattened_data[$field] = $flattened_changed[$field];
+		}
+
+		$merged_data = Mundo::inflate($flattened_data);
 
 		// Update our values in the model
-		$document->set($changed_data)->save();
+		$document->set($changed_data);
+		$document->save();
 
 		// Original data will be $merged from above
 		$this->assertEquals($document->original(), $merged_data);
@@ -1109,7 +2130,89 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 			$this->assertEquals($loaded_object->get(), $document->original());
 		}
 	}
-            
+
+	/**
+	 * Test that the update function creates the correct atomic operation
+	 * queries for updating data
+	 *
+	 * @test
+	 * @covers Mundo_Object::update
+	 * @dataProvider provider_update
+	 *
+	 * @param  array  array of model data to set and load
+	 * @param  array  array of model data to change
+	 * @param  array  expected atomic operation query
+	 * @return void
+	 */
+	public function test_update_updates_atomically($data, $changed_data, $expected_atomic_operation)
+	{
+		/*
+		$document = new Model_Blogpost($data);
+
+		// Update requires a loaded document.
+		$document->load();
+
+		// Sanity check
+		if ( ! $document->loaded())
+		{
+			$this->fail("A document could not be loaded");
+		}
+
+		// Replace our $data variable with the full document in the DB (add the _id field)
+		$data = $document->get();
+
+		// Change our data
+		$document->set($changed_data);
+
+		$document->update();
+
+		// Merge our data to compare the new representation with what it should be
+		$merged_data = array_merge(Mundo::flatten($data), Mundo::flatten($changed_data));
+		$merged_data = Mundo::inflate($merged_data);
+
+		// Test that the update was as atomic as we expected
+		$this->assertEquals($document->last_update(), $expected_atomic_operation);
+
+		// Test that the data is now saved
+		$this->assertEquals($document->get(), $merged_data);
+
+		// Test that changed is now empty
+		$this->assertEmpty($document->changed());
+
+		// Sanity check: reload the model in a new object and compare data to ensure it went to the database A-OK
+		$reloaded_document = new Model_Blogpost();
+		$reloaded_document->set('_id', $document->get('_id'))->load();
+
+		// If the query was successful these should be the same
+		$this->assertEquals($document->get(), $reloaded_document->get());
+		 */
+	}
+
+
+	/**
+	 * @todo Test update() fails with invalid data
+	 */
+
+	/**
+	 * Ensures that running the update method on an object that hasn't been
+	 * loaded from the database fails
+	 *
+	 * @test
+	 * @covers Mundo_Object::update
+	 * @expectedException Mundo_Exception
+	 * @expectedExceptionMessage Cannot atomically update the document because the model has not yet been loaded
+	 *
+	 * @return void
+	 */
+	public function test_updating_unloaded_object_fails()
+	{
+		$document = new Model_Blogpost;
+
+		$document->set('post_title', 'This is the post title');
+
+		$document->update();
+	}
+   
 	/** 
 	 * @todo Test atomic operations using a query passed as an argument
 	 *       on loaded and unloaded models (maybe?)
