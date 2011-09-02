@@ -67,6 +67,53 @@ class Mundo_Object_Core
 	protected $_safe;
 
 	/**
+	 * This is a container for the object's saved data
+	 *
+	 * @var array
+	 */
+	protected $_data = array();
+
+	/**
+	 * A container for changed data that needs saving to our collection
+	 *
+	 * @var array
+	 */
+	protected $_changed = array();
+
+	/**
+	 * Whether we have a document loaded from the database
+	 *
+	 * @var boolean
+	 */
+	protected $_loaded = FALSE;
+
+	/**
+	 * Stores an array containing the last update() query sent to the driver
+	 * Mongo PHP driver
+	 *
+	 * @var array
+	 **/
+	protected $_last_update;
+
+	/**
+	 * An array which contains the next atomical update to save $_changed
+	 * data in the collection. We organise all array fields so we don't
+	 * have to check if they exists to add to them when changing data.
+	 *
+	 * @var array
+	 */
+	protected $_next_update = array(
+			'$pushAll' => array(), // This takes care of $push
+			'$pullAll' => array(), // This takes care of $pull
+			'$addToSet' => array(),
+			'$pop' => array(),
+			'$bit' => array(),
+			'$inc' => array(),
+			'$set' => array(),
+			'$unset' => array(),
+		);
+
+	/**
 	 * Initialise our data
 	 *
 	 * @param array $data 
@@ -84,18 +131,18 @@ class Mundo_Object_Core
 	}
 
 	/**
-	 * This is a container for the object's saved data
+	 * Allow setting our field values by overloading, as in:
 	 *
-	 * @var array
-	 */
-	protected $_data = array();
-
-	/**
-	 * A container for changed data that needs saving to our collection
+	 *    $model->field = $value;
 	 *
-	 * @var array
+	 * @param  string  $field   Field name
+	 * @param  string  $value  Value
+	 * @return void
 	 */
-	protected $_changed = array();
+	public function __set($field, $value)
+	{
+		$this->set($field, $value);
+	}
 
 	/**
 	 * Assigns field data by name. Assigned variables will first be added to
@@ -163,17 +210,74 @@ class Mundo_Object_Core
 	}
 
 	/**
-	 * Allow setting our field values by overloading, as in:
+	 * Allow retrieving field values via overloading.
 	 *
-	 *    $model->field = $value;
+	 * !! Note: Returns NULL if field does not exist.
 	 *
-	 * @param  string  $field   Field name
-	 * @param  string  $value  Value
+	 * @param  string  $field  name of field to retrieve
+	 * @return mixed
+	 */
+	public function __get($field)
+	{
+		return $this->get($field);
+	}
+
+	/**
+	 * Gets data from the object. Note that this merges the original data 
+	 * ($_data) and the changed data ($_changed) before returning.
+	 *
+	 * @param  string  Path of the field to return (eg. comments.0.author)
+	 * @return mixed   Array of data if no path was supplied, or the value of the field/null if no field was found
+	 **/
+	public function get($path = NULL)
+	{
+		if ( ! $path)
+		{
+			// Flatten data so we can remove any NULL elements
+			$data = Mundo::flatten($this->_merge());
+
+			// Remove empty fields
+			$data = array_filter($data);
+
+			// Return purged data
+			return (empty($data)) ? NULL : Mundo::inflate($data);
+		}
+
+		$data = Arr::path($this->_merge(), $path);
+
+		// If it's not an array return it
+		if ( ! is_array($data))
+			return $data;
+
+		// Flatten the data
+		$data = Mundo::flatten($data); 
+
+		// Remove empty fields
+		$data = array_filter($data);
+
+		return Mundo::inflate($data);
+	}
+
+	/**
+	 * Checks if a field's value is set
+	 *
+	 * @param  string  $field field name
+	 * @return bool
+	 */
+	public function __isset($field)
+	{
+		return ! ($this->get($field) === NULL);
+	}
+
+	/**
+	 * Unset a field's data (ie. reset it's data to NULL)
+	 *
+	 * @param  string $field  Field name to unset
 	 * @return void
 	 */
-	public function __set($field, $value)
+	public function __unset($field)
 	{
-		$this->set($field, $value);
+		$this->unset_atomic($field);
 	}
 
 	/**
@@ -237,6 +341,75 @@ class Mundo_Object_Core
 	}
 
 	/**
+	 * Gets changed data for a given field. If no field is supplied, this
+	 * returns all changed data.
+	 *
+	 * @return mixed
+	 */
+	public function changed($path = NULL)
+	{
+		if ( ! $path)
+		{
+			return $this->_changed;
+		}
+
+		return Arr::path($this->_changed, $path);
+	}
+
+	/**
+	 * Gets original (saved) data for a given field. If no field is supplied, 
+	 * this returns all original data.
+	 *
+	 * @return mixed
+	 */
+	public function original($path = NULL)
+	{
+		if ( ! $path)
+		{
+			return $this->_data; 
+		}
+
+		return Arr::path($this->_data, $path);
+	}
+
+	/**
+	 * Returns the $_loaded value which indicates whether a document has been
+	 * loaded from the database
+	 *
+	 * @return boolean
+	 */
+	public function loaded()
+	{
+		return $this->_loaded;
+	}
+
+	/**
+	 * Convenience function for merging saved and changed data
+	 *
+	 * @return array
+	 */
+	protected function _merge()
+	{
+		return Arr::merge($this->_data, $this->_changed);
+	}
+
+	/**
+	 * Helper function which takes a field name and checks if it has been
+	 * defined in the model
+	 *
+	 * @param $field  string  field name
+	 * @return bool
+	 */
+	protected function _check_field_exists($field)
+	{
+		// Replace any positional modifier keys with '$'
+		$field = preg_replace('#\.[0-9]+#', '.$', $field);
+
+		// If the field exists or it is the parent of an embedded collection return true
+		return (in_array($field, $this->_fields) OR preg_grep('/^'.str_replace(array('$', '.'), array('\$', '\.'), $field).'\./', $this->_fields));
+	}
+
+	/**
 	 * Helper method for the atomic operation $inc
 	 *
 	 * This method passes all logic thanks to set() and checks that
@@ -281,120 +454,96 @@ class Mundo_Object_Core
 		return $this;
 	}
 
-
-
 	/**
-	 * Allow retrieving field values via overloading.
+	 * Pushes $data onto the end of an array. This replaces array_push
+	 * because of overloaded properties, and accepts the same arguments
+	 * as array_push
 	 *
-	 * !! Note: Returns NULL if field does not exist.
-	 *
-	 * @param  string  $field  name of field to retrieve
-	 * @return mixed
-	 */
-	public function __get($field)
-	{
-		return $this->get($field);
-	}
-
-
-	/**
-	 * Checks if a field's value is set
-	 *
-	 * @param  string  $field field name
-	 * @return bool
-	 */
-	public function __isset($field)
-	{
-		return ! ($this->get($field) === NULL);
-	}
-
-	/**
-	 * Unset a field's data (ie. reset it's data to NULL)
-	 *
-	 * @param  string $field  Field name to unset
-	 * @return void
-	 */
-	public function __unset($field)
-	{
-		$this->unset_atomic($field);
-	}
-
-	/**
-	 * Gets data from the object. Note that this merges the original data 
-	 * ($_data) and the changed data ($_changed) before returning.
-	 *
-	 * @param  string  Path of the field to return (eg. comments.0.author)
-	 * @return mixed   Array of data if no path was supplied, or the value of the field/null if no field was found
+	 * @param  $field  the field we are pushing data onto
+	 * @param  $data1, $data2... Data to push onto the end of this array
+	 * @return int     the total number of elements in the array
 	 **/
-	public function get($path = NULL)
+	public function push()
 	{
-		if ( ! $path)
+		// Get the function arguments
+		$args = func_get_args();
+
+		// Shift the field name from the data to append
+		$field = array_shift($args);
+
+		if ( ! $this->_check_field_exists($field))
 		{
-			// Flatten data so we can remove any NULL elements
-			$data = Mundo::flatten($this->_merge());
-
-			// Remove empty fields
-			$data = array_filter($data);
-
-			// Return purged data
-			return (empty($data)) ? NULL : Mundo::inflate($data);
+			// Fail because there's nothing to modify
+			throw new Mundo_Exception("Field ':field' does not exist", array(':field' => $field));
 		}
 
-		$data = Arr::path($this->_merge(), $path);
+		// Find out how many embedded collections are in $field (this will give us the next array key too)
+		$count = count($this->get($field));
 
-		// If it's not an array return it
+		// Loop through each piece of data to push onto the $field
+		foreach($args as $data)
+		{
+			$this->_changed[$field][$count] = $data;
+			$count++;
+		}
+
+		if (isset($this->_next_update['$pushAll'][$field]))
+		{
+			// Add the data to the $pushAll
+			$this->_next_update['$pushAll'][$field] = array_merge($this->_next_update['$pushAll'][$field], $args);
+		}
+		else
+		{
+			$this->_next_update['$pushAll'][$field] = $args;
+		}
+
+		return $count;
+	}
+
+	/**
+	 * Removes the last element in the array $field and returns it.
+	 *
+	 * @param  $field  the field we are popping
+	 * @return mixed   popped data 
+	 */
+	public function pop($field)
+	{
+		// Get the most recent model data
+		$data = $this->get($field);
+
 		if ( ! is_array($data))
-			return $data;
-
-		// Flatten the data
-		$data = Mundo::flatten($data); 
-
-		// Remove empty fields
-		$data = array_filter($data);
-
-		return Mundo::inflate($data);
-	}
-
-	/**
-	 * Gets changed data for a given field. If no field is supplied, this
-	 * returns all changed data.
-	 *
-	 * @return mixed
-	 */
-	public function changed($path = NULL)
-	{
-		if ( ! $path)
 		{
-			return $this->_changed;
+			// We can only pop arrays
+			throw new Mundo_Exception("Field ':field' is not an array", array(':field' => $field));
 		}
 
-		return Arr::path($this->_changed, $path);
-	}
+		// Find the last key we're modifying
+		$count = count($data) - 1;
 
-	/**
-	 * Gets original (saved) data for a given field. If no field is supplied, 
-	 * this returns all original data.
-	 *
-	 * @return mixed
-	 */
-	public function original($path = NULL)
-	{
-		if ( ! $path)
+		// Is this a variable that has been pushed and hasn't been written to the database?
+		if (isset($this->_changed[$field][$count]) AND isset($this->_next_update['$pushAll'][$field]))
 		{
-			return $this->_data; 
+			// If so, stop it from being added in $pushAll
+			array_pop($this->_next_update['$pushAll'][$field]);
+
+			// If that was the only atomic update for the $field...
+			if (empty($this->_next_update['$pushAll'][$field]))
+			{
+				// Remove the $field completely
+				unset($this->_next_update['$pushAll'][$field]);
+			}
+		}
+		else
+		{
+			// Add this to $_next_update
+			$this->_next_update['$pop'] += array($field => 1);
 		}
 
-		return Arr::path($this->_data, $path);
-	}
+		// Set the last element of the array to null so it overwrites data in get()
+		$this->_changed[$field][$count] = NULL;
 
-	/**
-	 * Convenience function for merging saved and changed data
-	 *
-	 * @return array
-	 */
-	protected function _merge()
-	{
-		return Arr::merge($this->_data, $this->_changed);
+		// Return the element we just set to null from $data
+		return $data[$count];
 	}
 
 	/**
@@ -512,21 +661,59 @@ class Mundo_Object_Core
 	}
 
 	/**
-	 * Whether we have a document loaded from the database
+	 * Loads a single document from the database using the object's
+	 * current data
 	 *
-	 * @var boolean
+	 * @param   MongoId   Object ID if you want to load from a specific ID without other model data
+	 * @return  $this
 	 */
-	protected $_loaded = FALSE;
-
-	/**
-	 * Returns the $_loaded value which indicates whether a document has been
-	 * loaded from the database
-	 *
-	 * @return boolean
-	 */
-	public function loaded()
+	public function load($object_id = NULL)
 	{
-		return $this->_loaded;
+		$query = array();
+
+		/**
+		 * @todo Assess the below: should we just attempt to check for
+		 * an object_id argument, use the current $_id from merged and
+		 * then use all data instead of this?
+		 */
+
+		if ($object_id)
+		{
+			// Load from the given ObjectId
+			$query = array('_id' => $object_id);
+		}
+		elseif ( ! $this->changed() AND ! $this->loaded())
+		{
+			// No data to query with
+			throw new Mundo_Exception("No model data supplied");
+		}
+		elseif ( ! $this->changed())
+		{
+			// No changed data, so assume we are reloading our object. Use the current ObjectId.
+			$query = array('_id' => $this->get('_id'));
+		}
+		else
+		{
+			// Use all recent data as our query
+			$query = $this->get();
+		}
+
+		// Initialise our database
+		$this->_init_db();
+
+		if ($result = $this->_collection->findOne($query))
+		{
+			// Assign our returned data
+			$this->_data = $result;
+
+			// Set our loaded flag
+			$this->_loaded = TRUE;
+
+			// Reset our changed array
+			$this->_changed = array();
+		}
+
+		return $this;
 	}
 
 	/**
@@ -690,140 +877,6 @@ class Mundo_Object_Core
 	}
 
 	/**
-	 * Pushes $data onto the end of an array. This replaces array_push
-	 * because of overloaded properties, and accepts the same arguments
-	 * as array_push
-	 *
-	 * @param  $field  the field we are pushing data onto
-	 * @param  $data1, $data2... Data to push onto the end of this array
-	 * @return int     the total number of elements in the array
-	 **/
-	public function push()
-	{
-		// Get the function arguments
-		$args = func_get_args();
-
-		// Shift the field name from the data to append
-		$field = array_shift($args);
-
-		if ( ! $this->_check_field_exists($field))
-		{
-			// Fail because there's nothing to modify
-			throw new Mundo_Exception("Field ':field' does not exist", array(':field' => $field));
-		}
-
-		// Find out how many embedded collections are in $field (this will give us the next array key too)
-		$count = count($this->get($field));
-
-		// Loop through each piece of data to push onto the $field
-		foreach($args as $data)
-		{
-			$this->_changed[$field][$count] = $data;
-			$count++;
-		}
-
-		if (isset($this->_next_update['$pushAll'][$field]))
-		{
-			// Add the data to the $pushAll
-			$this->_next_update['$pushAll'][$field] = array_merge($this->_next_update['$pushAll'][$field], $args);
-		}
-		else
-		{
-			$this->_next_update['$pushAll'][$field] = $args;
-		}
-
-		return $count;
-	}
-
-	/**
-	 * Removes the last element in the array $field and returns it.
-	 *
-	 * @param  $field  the field we are popping
-	 * @return mixed   popped data 
-	 */
-	public function pop($field)
-	{
-		// Get the most recent model data
-		$data = $this->get($field);
-
-		if ( ! is_array($data))
-		{
-			// We can only pop arrays
-			throw new Mundo_Exception("Field ':field' is not an array", array(':field' => $field));
-		}
-
-		// Find the last key we're modifying
-		$count = count($data) - 1;
-
-		// Is this a variable that has been pushed and hasn't been written to the database?
-		if (isset($this->_changed[$field][$count]) AND isset($this->_next_update['$pushAll'][$field]))
-		{
-			// If so, stop it from being added in $pushAll
-			array_pop($this->_next_update['$pushAll'][$field]);
-
-			// If that was the only atomic update for the $field...
-			if (empty($this->_next_update['$pushAll'][$field]))
-			{
-				// Remove the $field completely
-				unset($this->_next_update['$pushAll'][$field]);
-			}
-		}
-		else
-		{
-			// Add this to $_next_update
-			$this->_next_update['$pop'] += array($field => 1);
-		}
-
-		// Set the last element of the array to null so it overwrites data in get()
-		$this->_changed[$field][$count] = NULL;
-
-		// Return the element we just set to null from $data
-		return $data[$count];
-	}
-
-	/**
-	 * Helper function which takes a field name and checks if it has been
-	 * defined in the model
-	 *
-	 * @param $field  string  field name
-	 * @return bool
-	 */
-	protected function _check_field_exists($field)
-	{
-		// Replace any positional modifier keys with '$'
-		$field = preg_replace('#\.[0-9]+#', '.$', $field);
-
-		// If the field exists or it is the parent of an embedded collection return true
-		return (in_array($field, $this->_fields) OR preg_grep('/^'.str_replace(array('$', '.'), array('\$', '\.'), $field).'\./', $this->_fields));
-	}
-
-	/**
-	 * Stores an array containing the last update() query sent to the driver
-	 * Mongo PHP driver
-	 *
-	 * @var array
-	 **/
-	protected $_last_update;
-
-	/**
-	 * An array which contains the next atomical update to save $_changed
-	 * data in the collection. We organise all array fields so we don't
-	 * have to check if they exists to add to them when changing data.
-	 *
-	 * @var array
-	 */
-	protected $_next_update = array(
-			'$pushAll' => array(), // This takes care of $push
-			'$pullAll' => array(), // This takes care of $pull
-			'$addToSet' => array(),
-			'$pop' => array(),
-			'$bit' => array(),
-			'$inc' => array(),
-			'$set' => array(),
-			'$unset' => array(),
-		);
-
-	/**
 	 * Returns the query used to atomically update currently changed data
 	 *
 	 * @param  string  Atomic operator to return. Will return all atomic 
@@ -855,7 +908,6 @@ class Mundo_Object_Core
 		}
 
 		return $this->_next_update[$operator];
-
 	}
 
 	/**
@@ -916,62 +968,6 @@ class Mundo_Object_Core
 
 		// Load our selected collection using the same variable as our collection name.
 		$this->_collection = $this->_db->{$this->_collection};
-
-		return $this;
-	}
-
-	/**
-	 * Loads a single document from the database using the object's
-	 * current data
-	 *
-	 * @param   MongoId   Object ID if you want to load from a specific ID without other model data
-	 * @return  $this
-	 */
-	public function load($object_id = NULL)
-	{
-		$query = array();
-
-		/**
-		 * @todo Assess the below: should we just attempt to check for
-		 * an object_id argument, use the current $_id from merged and
-		 * then use all data instead of this?
-		 */
-
-		if ($object_id)
-		{
-			// Load from the given ObjectId
-			$query = array('_id' => $object_id);
-		}
-		elseif ( ! $this->changed() AND ! $this->loaded())
-		{
-			// No data to query with
-			throw new Mundo_Exception("No model data supplied");
-		}
-		elseif ( ! $this->changed())
-		{
-			// No changed data, so assume we are reloading our object. Use the current ObjectId.
-			$query = array('_id' => $this->get('_id'));
-		}
-		else
-		{
-			// Use all recent data as our query
-			$query = $this->get();
-		}
-
-		// Initialise our database
-		$this->_init_db();
-
-		if ($result = $this->_collection->findOne($query))
-		{
-			// Assign our returned data
-			$this->_data = $result;
-
-			// Set our loaded flag
-			$this->_loaded = TRUE;
-
-			// Reset our changed array
-			$this->_changed = array();
-		}
 
 		return $this;
 	}

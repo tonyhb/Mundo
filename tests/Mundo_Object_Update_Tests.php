@@ -236,7 +236,7 @@ class Mundo_Object_Update_Tests extends PHPUnit_Framework_TestCase {
 
 		$data = self::$model->get();
 
-		echo Debug::vars(self::$model->update());
+		self::$model->update();
 
 		$test_load = new Model_Blogpost;
 		$test_load->_id = $data['_id'];
