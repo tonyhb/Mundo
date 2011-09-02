@@ -249,7 +249,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 
 
 			// Ensure the atomic operators got updated
-			$modifiers = self::$empty_update;
+			$modifiers = array('$set' => array());
 			$flat_data = Mundo::flatten($data);
 			$modifiers['$set'] += $flat_data;
 
@@ -705,7 +705,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 
 		$document->set('post_title', 4);
 
-		$modifiers = self::$empty_update;
+		$modifiers = array();
 
 		$modifiers['$inc'] = array(
 			'post_title' => 4
@@ -850,7 +850,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		$this->assertEmpty($document->changed());
 
 		$this->assertEquals(
-			self::$empty_update,
+			array(),
 			$document->next_update()
 		);
 
@@ -1440,7 +1440,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		// Initialise our model
 		$document = new Model_Blogpost($data);
 
-		if ($document->next_update() == self::$empty_update)
+		if ($document->next_update() == array())
 		{
 			$this->fail('The update array should have been updated when setting $data');
 			return;
@@ -1449,7 +1449,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		$document->save();
 
 		// Ensure saving resets our update array
-		$this->assertEquals($document->next_update(), self::$empty_update);
+		$this->assertEquals($document->next_update(), array());
 
 		if ($multiple_push_arrays)
 		{
@@ -1757,16 +1757,9 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		$this->assertEquals(
 			$document->next_update(),
 			array(
-				'$pushAll' => array(),
-				'$pullAll' => array(),
-				'$addToSet' => array(),
-				'$pop' => array(),
-				'$bit' => array(),
-				'$inc' => array(),
 				'$set' => array(
 					'post_title' => 'Post title',
 				),
-				'$unset' => array(),
 			)
 		);
 
@@ -1783,7 +1776,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 
 		$this->assertEquals(
 			$document->next_update(),
-			self::$empty_update
+			array()
 		);
 
 		$this->assertEquals(
@@ -1799,7 +1792,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		unset($document->post_title);
 		$this->assertEquals(
 			$document->next_update(),
-			self::$empty_update
+			array()
 		);
 
 		$this->assertEquals(
@@ -1816,7 +1809,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 
 		$this->assertEquals(
 			$document->next_update(),
-			self::$empty_update
+			array()
 		);
 
 		$this->assertEquals(
@@ -1850,13 +1843,6 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 						)
 					),
 				),
-				'$pullAll' => array(),
-				'$addToSet' => array(),
-				'$pop' => array(),
-				'$bit' => array(),
-				'$inc' => array(),
-				'$set' => array(),
-				'$unset' => array(),
 			)
 		);
 
@@ -1889,7 +1875,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 
 		$this->assertEquals(
 			$document->next_update(),
-			self::$empty_update
+			array()
 		);
 
 		$document->unset_atomic('post_title');
@@ -1900,13 +1886,6 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		$this->assertEquals(
 			$document->next_update(),
 			array(
-				'$pushAll' => array(),
-				'$pullAll' => array(),
-				'$addToSet' => array(),
-				'$pop' => array(),
-				'$bit' => array(),
-				'$inc' => array(),
-				'$set' => array(),
 				'$unset' => array(
 					'post_title' => 1
 				),
@@ -1921,16 +1900,9 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 
 		$this->assertEquals(
 			array(
-				'$pushAll' => array(),
-				'$pullAll' => array(),
-				'$addToSet' => array(),
-				'$pop' => array(),
-				'$bit' => array(),
-				'$inc' => array(),
 				'$set' => array(
 					'post_title' => 'Post title',
 				),
-				'$unset' => array(),
 			),	
 			$document->next_update()
 		);

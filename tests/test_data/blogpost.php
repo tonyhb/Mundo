@@ -46,6 +46,7 @@ class Model_Blogpost extends Mundo_Object
 		'comments.$.author_url',
 		'comments.$.author_email',
 		'comments.$.likes.$',
+		'comments.$.like_count',
 	);
 
 	/**
@@ -94,6 +95,9 @@ class Model_Blogpost extends Mundo_Object
 		),
 		'comments.$.likes.$' => array(
 			array('regex', array(':value', '/^[\w\s]+$/')),
+		),
+		'comments.$.like_count' => array(
+			array('numeric'),
 		),
 		'post_metadata.keywords' => array(
 			array('not_empty'),

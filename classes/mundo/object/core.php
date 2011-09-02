@@ -637,7 +637,7 @@ class Mundo_Object_Core
 	 * Atomically updates the document according to data in the changed
 	 * property.
 	 *
-	 * @returns $this
+	 * @returns bool whether the update was successful or not
 	 */
 	public function update()
 	{
@@ -653,13 +653,11 @@ class Mundo_Object_Core
 
 		$this->_init_db();
 
-		// Remove unnecessary atomic modifiers
-		$update = Mundo::flatten($this->_next_update);
-		$update = array_filter($update);
-		$update = Mundo::inflate($update);
+		// Put our modifier query into a variable
+		$update = $this->next_update();
 
 		// Update using our $id
-		$this->_collection->update(array('_id' => $this->get('_id')), $update);
+		$status = $this->_collection->update(array('_id' => $this->get('_id')), $update, array('safe' => $this->_safe));
 
 		// Get our original data so we can merge changes
 		$data = $this->original();
@@ -688,7 +686,7 @@ class Mundo_Object_Core
 		// Ensure we're loaded if that was an upsert
 		$this->_loaded = TRUE;
 
-		return $this;
+		return $status;
 	}
 
 	/**
@@ -835,7 +833,21 @@ class Mundo_Object_Core
 	public function next_update($operator = NULL)
 	{
 		if ($operator === NULL)
-			return $this->_next_update;
+		{
+			// Intialise our return array
+			$update = array();
+
+			// Loop through each modifier and remove the empty ones
+			foreach($this->_next_update as $modifier => $data)
+			{
+				if ( ! empty($data))
+				{
+					$update[$modifier] = $data;
+				}
+			}
+
+			return $update;
+		}
 
 		if ( ! array_key_exists($operator, $this->_next_update))
 		{
