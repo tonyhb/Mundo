@@ -3,25 +3,31 @@
 	bootstrap="../../../public_html/index.php"
 	verbose="true"
 	stopOnError="false"
-    stopOnFailure="false"
-    stopOnIncomplete="false"
-    stopOnSkipped="false"
+	stopOnFailure="false"
+	stopOnIncomplete="false"
+	stopOnSkipped="false"
 	> 
 
 	<php>
-		<server name="HTTP_HOST" value="metamongo.local"/>
+		<server name="HTTP_HOST" value="Mundo.local" />
+		<server name="KOHANA_ENV" value="TESTING" />
 	</php>
 
 	<testsuites> 
-      <testsuite name="MetaMongo Tests"> 
-		<file>./MetaMongoTests.php</file>
-	  </testsuite> 
-    </testsuites> 
+		<testsuite name="Mundo Tests"> 
+			<file>./Mundo_Tests.php</file>
+			<file>./Mundo_Object_Tests.php</file>
+			<file>./Mundo_Object_Update_Tests.php</file>
+		</testsuite> 
+	</testsuites> 
 
 	<filter>
-	  <whitelist>
-	    <directory suffix=".php">../../</directory>
-	  </whitelist>
+		<whitelist>
+			<directory suffix=".php">../classes/</directory>
+			<exclude>
+				<file>../classes/mundo.php</file>
+			</exclude>
+		</whitelist>
 	</filter>
 
 </phpunit>

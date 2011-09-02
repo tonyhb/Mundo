@@ -3,9 +3,9 @@
 /**
  * Empty base class for overriding capabilities
  *
- * @package MetaMongo
+ * @package Mundo
  * @author Tony Holdstock-Brown
  **/
-class MetaMongo extends MetaMongo_Core {}
+class Mundo extends Mundo_Core {}
 
-// End MetaMongo
+// End Mundo
