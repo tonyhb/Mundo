@@ -47,7 +47,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 */
 	public static function provider_set_and_get()
 	{
-		// $data, $expected_error (null if it should succeed)
+		// $data, $expected_error (null if it should succeed), $expected_result (with dot notation)
 		return array(
 			// A full dataset
 			array(
@@ -246,6 +246,14 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 				$this->assertSame($Mundo->get(), $data);
 				$this->assertSame($Mundo->changed(), $data);
 			}
+
+
+			// Ensure the atomic operators got updated
+			$modifiers = self::$empty_update;
+			$flat_data = Mundo::flatten($data);
+			$modifiers['$set'] += $flat_data;
+
+			$this->assertEquals($modifiers, $Mundo->next_update());
 		}
 	}
 
@@ -679,6 +687,215 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 		{
 			$this->assertSame($expected_errors, $validation->errors(TRUE));
 		}
+	}
+
+	/**
+	 * Tests the inc set methods atomicity with the $inc modifier
+	 *
+	 * @test
+	 * @covers Mundo_Object::inc
+	 * @covers Mundo_Object::set
+	 * @return void
+	 */
+	public function test_inc_atomicity()
+	{
+		$document = new Model_Blogpost;
+
+		$document->set('post_title', 4);
+
+		$modifiers = self::$empty_update;
+
+		$modifiers['$inc'] = array(
+			'post_title' => 4
+		);
+			
+		$this->assertEquals(
+			$modifiers,
+			$document->next_update()
+		);
+
+		// Ensure that overwriting a non-saved $inc uses $original data for calculations
+
+		$document->set('post_title', 8);
+
+		$modifiers['$inc'] = array(
+			'post_title' => 8
+		);
+
+		$this->assertEquals(
+			$modifiers,
+			$document->next_update()
+		);
+
+		// Test overwriting a saved $inc uses saved $original data for calctulations
+
+		$document->set(array(
+			'post_title' => 4,
+			'post_slug' => 'post-slug',
+			'post_date' => new MongoDate,
+			'author' => new MongoId,
+			'author_name' => 'Author Name',
+			'author_email' => 'email@example.com',
+			'post_content' => 'Content',
+			'post_metadata' => array(
+				'keywords' => 'keyword one',
+				'description' => 'keyword two',
+			),
+			'comments' => array(
+				array(
+					'comment' => 'Comment 2',
+					'author_name' => 'Comment author',
+					'author_email' => 'comment.2@example.com',
+				)
+			)
+		));
+
+		$document->save();
+
+		$document->post_title = 5;
+
+		$modifiers['$inc'] = array(
+			'post_title' => 1
+		);
+
+		$this->assertEquals(
+			$modifiers,
+			$document->next_update()
+		);
+
+		$document->post_title = 6;
+
+		$modifiers['$inc'] = array(
+			'post_title' => 2
+		);
+
+		$this->assertEquals(
+			$modifiers,
+			$document->next_update()
+		);
+
+		/**
+		 * Test the inc method
+		 */
+		$document->inc('post_title', 5);
+
+		$modifiers['$inc'] = array(
+			'post_title' => 1
+		);
+
+		$this->assertEquals(
+			$modifiers,
+			$document->next_update()
+		);
+
+		$document->inc('post_title', 6);
+
+		$modifiers['$inc'] = array(
+			'post_title' => 2
+		);
+
+		$this->assertEquals(
+			$modifiers,
+			$document->next_update()
+		);
+	}
+
+	/**
+	 * Ensures the inc method throws an error when called on a field
+	 * that has non-numeric saved data
+	 *
+	 * @test
+	 * @covers Mundo_Object::inc
+	 * @return void
+	 */
+	public function test_inc_throws_error_when_field_is_non_numeric()
+	{
+		$document = new Model_Blogpost;
+
+		$document->set(array(
+			'post_title' => 'Title',
+			'post_slug' => 'post-slug',
+			'post_date' => new MongoDate,
+			'author' => new MongoId,
+			'author_name' => 'Author Name',
+			'author_email' => 'email@example.com',
+			'post_content' => 'Content',
+			'post_metadata' => array(
+				'keywords' => 'keyword one',
+				'description' => 'keyword two',
+			),
+			'comments' => array(
+				array(
+					'comment' => 'Comment 2',
+					'author_name' => 'Comment author',
+					'author_email' => 'comment.2@example.com',
+				)
+			)
+		));
+
+		$document->save();
+
+		try
+		{
+			$document->inc('post_title', 5);
+		}
+		catch(Mundo_Exception $e)
+		{
+			$this->assertSame($e->getMessage(), "Cannot apply \$inc modifier to non-number in field 'post_title'");
+			return;
+		}
+
+		$this->fail("The inc() method should have raised an exception when called upon a non-numeric field");
+	}
+
+
+
+	/**
+	 * Ensures the inc method throws an error when called with a
+	 * non-numeric value
+	 *
+	 * @test
+	 * @covers Mundo_Object::inc
+	 * @return void
+	 */
+	public function test_inc_throws_error_when_value_is_non_numeric()
+	{
+		$document = new Model_Blogpost;
+
+		$document->set(array(
+			'post_title' => 5,
+			'post_slug' => 'post-slug',
+			'post_date' => new MongoDate,
+			'author' => new MongoId,
+			'author_name' => 'Author Name',
+			'author_email' => 'email@example.com',
+			'post_content' => 'Content',
+			'post_metadata' => array(
+				'keywords' => 'keyword one',
+				'description' => 'keyword two',
+			),
+			'comments' => array(
+				array(
+					'comment' => 'Comment 2',
+					'author_name' => 'Comment author',
+					'author_email' => 'comment.2@example.com',
+				)
+			)
+		));
+
+		$document->save();
+
+		try
+		{
+			$document->inc('post_title', 'hello');
+		}
+		catch(Mundo_Exception $e)
+		{
+			$this->assertSame($e->getMessage(), "Cannot apply \$inc modifier with non-numeric values in field 'post_title'");
+			return;
+		}
+
+		$this->fail("The inc() method should have raised an exception when called upon a non-numeric field");
 	}
 
 	/**
@@ -1413,7 +1630,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 
 
 	/**
-	 * Tests unset
+	 * Tests unset's atomicity
 	 * @test
 	 * @covers Mundo_Object::set
 	 * @covers Mundo_Object::__unset
@@ -1425,7 +1642,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @param $push data to push
 	 * @returns void
 	 */
-	public function test_unset()
+	public function test_unset_atomicity()
 	{
 		/**
 		 * Basic set method testing. This tests:
@@ -1473,8 +1690,8 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 				'post_title' => NULL,
 			)
 		);
+		// Test 1 (unset_atomic) domplete
 
-		// This is guaranteed to change the next update array as asserted above
 		$document->post_title = 'Post title';
 
 		unset($document->post_title);
@@ -1592,6 +1809,28 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 					'post_title' => 1
 				),
 			)	
+		);
+
+		/**
+		 * Test that re-setting data removes the $unset modifier
+		 */
+
+		$document->post_title = 'Post title';
+
+		$this->assertEquals(
+			array(
+				'$pushAll' => array(),
+				'$pullAll' => array(),
+				'$addToSet' => array(),
+				'$pop' => array(),
+				'$bit' => array(),
+				'$inc' => array(),
+				'$set' => array(
+					'post_title' => 'Post title',
+				),
+				'$unset' => array(),
+			),	
+			$document->next_update()
 		);
 	}
 

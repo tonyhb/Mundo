@@ -146,7 +146,7 @@ class Mundo_Object_Core
 				unset($this->_next_update['$unset'][$field]);
 			}
 
-			if (is_numeric($value) AND is_numeric($this->original($field)))
+			if (is_numeric($value) AND (is_numeric($this->original($field)) OR $this->original($field) === NULL))
 			{
 				// Work out difference for incrementing
 				$difference = $value - $this->original($field);
@@ -258,16 +258,16 @@ class Mundo_Object_Core
 
 		foreach($values as $field => $value)
 		{
-			if ( ! is_numeric($this->get($field)))
+			if ( ! is_numeric($this->original($field)) AND $this->original($field) !== NULL)
 			{
 				// Non-numeric, cant $inc
-				throw new Mundo_Exception("Cannot apply $inc modifier to non-number in field ':field'", array(':field', $field));
+				throw new Mundo_Exception('Cannot apply $inc modifier to non-number in field \':field\'', array(':field' => $field));
 			}
 
 			if ( ! is_numeric($value))
 			{
 				// Can only apply $inc modifier with numeric values
-				throw new Mundo_Exception("Cannot apply $inc with non-numeric values in field ':field'", array(':field', $field));
+				throw new Mundo_Exception('Cannot apply $inc modifier with non-numeric values in field \':field\'', array(':field' => $field));
 			}
 		}
 
