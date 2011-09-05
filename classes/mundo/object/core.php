@@ -88,6 +88,12 @@ class Mundo_Object_Core
 	protected $_loaded = FALSE;
 
 	/**
+	 * Whether or not the model is partially loaded, ie. only selected
+	 * fields were returned from the database
+	 */
+	protected $_partial;
+
+	/**
 	 * Stores an array containing the last update() query sent to the driver
 	 * Mongo PHP driver
 	 *
@@ -384,6 +390,15 @@ class Mundo_Object_Core
 	}
 
 	/**
+	 * Returns whether the model is partially loaded and we only have
+	 * selected fiedls returned from the database.
+	 */
+	public function partial()
+	{
+		return $this->_partial;
+	}
+
+	/**
 	 * Convenience function for merging saved and changed data
 	 *
 	 * @return array
@@ -662,27 +677,24 @@ class Mundo_Object_Core
 
 	/**
 	 * Loads a single document from the database using the object's
-	 * current data
+	 * current data.
 	 *
-	 * @param   MongoId   Object ID if you want to load from a specific ID without other model data
+	 * You can pass an array of fields to return from the database. This
+	 * is the same argument as the $field in MongoCollection::find. 
+	 *
+	 * Note that unlike MongoCollection::find, this merges query data with
+	 * data returned from the database. For example, if you have a username
+	 * and load only the email address, the model will contain the username
+	 * and email address, not just the data returned from the database.
+	 *
+	 * @param   array  Array of fields to return or exclude from Mongo
 	 * @return  $this
 	 */
-	public function load($object_id = NULL)
+	public function load($fields = array())
 	{
 		$query = array();
 
-		/**
-		 * @todo Assess the below: should we just attempt to check for
-		 * an object_id argument, use the current $_id from merged and
-		 * then use all data instead of this?
-		 */
-
-		if ($object_id)
-		{
-			// Load from the given ObjectId
-			$query = array('_id' => $object_id);
-		}
-		elseif ( ! $this->changed() AND ! $this->loaded())
+		if ( ! $this->changed() AND ! $this->loaded())
 		{
 			// No data to query with
 			throw new Mundo_Exception("No model data supplied");
@@ -694,17 +706,25 @@ class Mundo_Object_Core
 		}
 		else
 		{
-			// Use all recent data as our query
+			// Use all recent data as our query. You should use either the _id or indexed keys here.
 			$query = $this->get();
 		}
 
 		// Initialise our database
 		$this->_init_db();
 
-		if ($result = $this->_collection->findOne($query))
+		if ($result = $this->_collection->findOne($query, $fields))
 		{
-			// Assign our returned data
-			$this->_data = $result;
+			if ( ! empty($fields))
+			{
+				// Merge returned fields with data we queried with
+				$this->_data = array_merge($this->get(), $result);
+			}
+			else
+			{
+				// There's no harm in overwriting all of our data with the query result
+				$this->_data = $result;
+			}
 
 			// Set our loaded flag
 			$this->_loaded = TRUE;
@@ -713,39 +733,32 @@ class Mundo_Object_Core
 			$this->_changed = array();
 		}
 
+		if (empty($fields))
+		{
+			// We loaded the full object from the database
+			$this->_partial = FALSE;
+		}
+		else
+		{
+			// We loaded only partial fields.
+			$this->_partial = TRUE;
+		}
+
 		return $this;
 	}
 
 	/**
 	 * Creates a new document in our collection
 	 *
-	 * @return  mixed  $this
+	 * @return  mixed  Same as MongoCollection::insert (@see 
+	 *                 http://php.net/manual/en/mongocollection.insert.php)
 	 * @throws  mixed  Validation_Exception, Mundo_Exception
 	 */
 	public function create()
 	{
-		if ($this->get('_id'))
+		if ($this->_loaded == TRUE)
 		{
-			// Running the load() method alters $_loaded, so we need to duplicate our class
-
-			// Get the model class name (PHP => 5.3.X )
-			$class = get_called_class();
-
-			// Create a duplicate class; 
-			$object = new $class;
-
-			// Assign our ID
-			$object->set('_id', $this->get('_id'));
-
-			// See if an object with this ID exists
-			if($object->load($this->get('_id'))->loaded())
-			{
-				// We cannot create a document with a duplicate ID
-				Throw new Mundo_Exception("Creating failed: a document with ObjectId ':object_id' exists already.", array(":object_id" => $this->get('_id')));
-			}
-
-			// Garbage collection
-			unset($object, $class);
+			throw new Mundo_Exception("Cannot create a new document because the model is already loaded");
 		}
 
 		// Ensure our data is valid
@@ -758,21 +771,11 @@ class Mundo_Object_Core
 		$data = $this->_merge();
 
 		// Insert our data
-		$this->_collection->insert($data, array('safe' => $this->_safe));
+		$return = $this->_collection->insert($data, array('safe' => $this->_safe));
 
-		// Reset our $_changed to empty after our save
-		$this->_changed = array();
+		$this->_clean_up($data);
 
-		// Reset the update variable
-		$this->_reset_update();
-
-		// Update our saved data variable
-		$this->_data = $data;
-
-		// We're now loaded
-		$this->_loaded = TRUE;
-
-		return $this;
+		return $return;
 	}
 
 	/**
@@ -782,12 +785,17 @@ class Mundo_Object_Core
 	 **/
 	public function save()
 	{
-		// Validate our data
-		$this->_validate();
-
 		// If we have no changed data why bother?
 		if ( ! $this->changed())
 			return $this;
+
+		if ($this->partial())
+		{
+			throw new Mundo_Exception("Cannot save the model because it is only partially loaded. Use the update method instead or fully load the object");
+		}
+
+		// Validate our data
+		$this->_validate();
 
 		// Get our original data so we can merge changes
 		$data = $this->original();
@@ -805,17 +813,7 @@ class Mundo_Object_Core
 		$this->_init_db();
 		$this->_collection->save($data, array('safe' => $this->_safe));
 
-		// Reset our changed array
-		$this->_changed = array();
-
-		// Reset the update variable
-		$this->_reset_update();
-
-		// Replace our data just in case an upsert created an ID
-		$this->_data = $data;
-
-		// Ensure we're loaded if that was an upsert
-		$this->_loaded = TRUE;
+		$this->_clean_up($data);
 
 		return $this;
 	}
@@ -861,20 +859,10 @@ class Mundo_Object_Core
 			Arr::set_path($data, $field, $value);
 		}
 
-		// Reset our changed array
-		$this->_changed = array();
-
 		// Copy the next update into last update
 		$this->_last_update = $update;
 
-		// Reset the update variable
-		$this->_reset_update();
-
-		// Replace our data just in case an upsert created an ID
-		$this->_data = $data;
-
-		// Ensure we're loaded if that was an upsert
-		$this->_loaded = TRUE;
+		$this->_clean_up($data);
 
 		return $status;
 	}
@@ -943,6 +931,29 @@ class Mundo_Object_Core
 		);
 	}
 
+	/**
+	 * Helper function for database interction methods.
+	 *
+	 * This is the model cleanup process after successful communication
+	 * with MongoDB
+	 *
+	 * @param  $array  new model data from database communication
+	 * @return void
+	 */
+	protected function _clean_up($data)
+	{
+		// Reset our $_changed to empty after our save
+		$this->_changed = array();
+
+		// Reset the update variable
+		$this->_reset_update();
+
+		// Update our saved data variable
+		$this->_data = $data;
+
+		// We're now loaded
+		$this->_loaded = TRUE;
+	}
 	/**
 	 * Connect to Mongo for queries
 	 *
