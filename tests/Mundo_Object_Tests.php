@@ -531,7 +531,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 			array(
 				// Incorrect post slug (first dimension error)
 				array(
-					'post_title'    => 'Example blog post',
+					'post_title'    => 'Another example blog post',
 					'post_slug'     => 'example-blog-post !',
 					'post_date'     => new MongoDate(strtotime("2nd February 2011, 2:56PM")),
 					'author'        => new MongoId('4d965966ef966f0916000000'),
@@ -1007,7 +1007,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @param  string  $expected_validation_errors    Expected validation error messages
 	 * @return void
 	 */
-	public function test_create_and_load_document($data, $validation_status, $expected_validation_errors = NULL)
+	public function test_create_and_load_and_load_selected_fields($data, $validation_status, $expected_validation_errors = NULL)
 	{
 		$document = new Model_Blogpost($data);
 
@@ -1034,14 +1034,20 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 			// Test reloading our saved object
 			$this->assertEquals($document->load()->get(), $saved_data);
 			
+			//
 			// Test loading from our ID
+			//
+
 			$loaded_object = new Model_Blogpost;
 			$loaded_object->set('_id', $document->original('_id'));
 			$loaded_object->load();
 
 			$this->assertEquals($loaded_object->get(), $document->original());
 			
+			//
 			// Test loading from non-unique keys.
+			//
+
 			$loaded_object = new Model_Blogpost($data);
 			$loaded_object->load();
 			$this->assertEquals($loaded_object->get(), $document->original());	
@@ -1083,7 +1089,101 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 			}
 
 			$this->fail("Data should have failed validation but an exception was not raised");
+		}
+	}
 
+	/**
+	 * This follows on from the previos method of creating data, and uses
+	 * the same saved data to attempt to load selected fields only.
+	 *
+	 * The model should load selected fields and set $_partial to true,
+	 * which should stop rogue save() calls overwriting the whole object.
+	 *
+	 * @test
+	 * @covers Mundo_Object::load
+	 * @covers Mundo_Object::partial
+	 * @covers Mundo_Object::loaded
+	 * @dataProvider provider_validate_and_create_data
+	 *
+	 * @param  array   $data   Data added to the database and available to query
+	 * @param  string  $validation_status   Whether $data should pass validation checks
+	 * @param  string  $expected_validation_errors    Expected validation error messages
+	 * @return void
+	 */
+	public function test_loading_partial_fields_works_and_running_save_fails($data, $validation_status, $expected_validation_errors = NULL)
+	{
+		if ($validation_status)
+		{
+			$load_selected_fields = new Model_Blogpost();
+
+			// Use a required field
+			$load_selected_fields->post_slug = $data['post_slug'];
+
+			// Load just the ID and post title from the post slug
+			$load_selected_fields->load(array('_id', 'post_title'));
+
+			// Ensure that partial() returns true because of the limited field returns
+			$this->assertTrue($load_selected_fields->partial());
+
+			// Create our array of data to compare to
+			$expected_getdata = array(
+				'_id' => $load_selected_fields->_id,
+				'post_title' => $data['post_title'],
+				'post_slug' => $data['post_slug'],
+			);
+
+			// Ensure that we've only got our selected fields
+			$this->assertEquals($expected_getdata, $load_selected_fields->get());
+
+			// Change a variable to allow saving/updating
+			$load_selected_fields->post_title = 'This is a new post title';
+
+			try
+			{
+				$load_selected_fields->save();
+			}
+			catch(Mundo_Exception $e)
+			{
+				$this->assertSame("Cannot save the model because it is only partially loaded. Use the update method instead or fully load the object", $e->getMessage());
+				return;
+			}
+
+			$this->fail("Model should not have saved because it is partially loaded");
+		}
+	}
+
+	/**
+	 * When a partial model has been loaded, ensure that running load
+	 * and returning the whole object sets $_partial to TRUE
+	 *
+	 * @test
+	 * @covers Mundo_Object::load
+	 * @covers Mundo_Object::partial
+	 * @dataProvider provider_validate_and_create_data
+	 *
+	 * @param  array   $data   Data added to the database and available to query
+	 * @param  string  $validation_status   Whether $data should pass validation checks
+	 * @param  string  $expected_validation_errors    Expected validation error messages
+	 * @return void
+	 */
+	public function test_loading_partial_then_loading_fully_resets_partial_property($data, $validation_status, $expected_validation_errors = NULL)
+	{
+		if ($validation_status)
+		{
+			$load_selected_fields = new Model_Blogpost();
+
+			// Use a required field
+			$load_selected_fields->post_slug = $data['post_slug'];
+
+			// Load just the ID and post title from the post slug
+			$load_selected_fields->load(array('_id', 'post_title'));
+
+			// Ensure that partial() returns true because of the limited field returns
+			$this->assertTrue($load_selected_fields->partial());
+
+			$load_selected_fields->load();
+
+			$this->assertFalse($load_selected_fields->partial());
 		}
 	}
 
