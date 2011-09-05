@@ -88,6 +88,12 @@ class Mundo_Object_Core
 	protected $_loaded = FALSE;
 
 	/**
+	 * Whether or not the model is partially loaded, ie. only selected
+	 * fields were returned from the database
+	 */
+	protected $_partial;
+
+	/**
 	 * Stores an array containing the last update() query sent to the driver
 	 * Mongo PHP driver
 	 *
@@ -384,6 +390,15 @@ class Mundo_Object_Core
 	}
 
 	/**
+	 * Returns whether the model is partially loaded and we only have
+	 * selected fiedls returned from the database.
+	 */
+	public function partial()
+	{
+		return $this->_partial;
+	}
+
+	/**
 	 * Convenience function for merging saved and changed data
 	 *
 	 * @return array
@@ -662,27 +677,24 @@ class Mundo_Object_Core
 
 	/**
 	 * Loads a single document from the database using the object's
-	 * current data
+	 * current data.
 	 *
-	 * @param   MongoId   Object ID if you want to load from a specific ID without other model data
+	 * You can pass an array of fields to return from the database. This
+	 * is the same argument as the $field in MongoCollection::find. 
+	 *
+	 * Note that unlike MongoCollection::find, this merges query data with
+	 * data returned from the database. For example, if you have a username
+	 * and load only the email address, the model will contain the username
+	 * and email address, not just the data returned from the database.
+	 *
+	 * @param   array  Array of fields to return or exclude from Mongo
 	 * @return  $this
 	 */
-	public function load($object_id = NULL)
+	public function load($fields = array())
 	{
 		$query = array();
 
-		/**
-		 * @todo Assess the below: should we just attempt to check for
-		 * an object_id argument, use the current $_id from merged and
-		 * then use all data instead of this?
-		 */
-
-		if ($object_id)
-		{
-			// Load from the given ObjectId
-			$query = array('_id' => $object_id);
-		}
-		elseif ( ! $this->changed() AND ! $this->loaded())
+		if ( ! $this->changed() AND ! $this->loaded())
 		{
 			// No data to query with
 			throw new Mundo_Exception("No model data supplied");
@@ -694,23 +706,42 @@ class Mundo_Object_Core
 		}
 		else
 		{
-			// Use all recent data as our query
+			// Use all recent data as our query. You should use either the _id or indexed keys here.
 			$query = $this->get();
 		}
 
 		// Initialise our database
 		$this->_init_db();
 
-		if ($result = $this->_collection->findOne($query))
+		if ($result = $this->_collection->findOne($query, $fields))
 		{
-			// Assign our returned data
-			$this->_data = $result;
+			if ( ! empty($fields))
+			{
+				// Merge returned fields with data we queried with
+				$this->_data = array_merge($this->get(), $result);
+			}
+			else
+			{
+				// There's no harm in overwriting all of our data with the query result
+				$this->_data = $result;
+			}
 
 			// Set our loaded flag
 			$this->_loaded = TRUE;
 
 			// Reset our changed array
 			$this->_changed = array();
+		}
+
+		if (empty($fields))
+		{
+			// We loaded the full object from the database
+			$this->_partial = FALSE;
+		}
+		else
+		{
+			// We loaded only partial fields.
+			$this->_partial = TRUE;
 		}
 
 		return $this;
@@ -754,12 +785,17 @@ class Mundo_Object_Core
 	 **/
 	public function save()
 	{
-		// Validate our data
-		$this->_validate();
-
 		// If we have no changed data why bother?
 		if ( ! $this->changed())
 			return $this;
+
+		if ($this->partial())
+		{
+			throw new Mundo_Exception("Cannot save the model because it is only partially loaded. Use the update method instead or fully load the object");
+		}
+
+		// Validate our data
+		$this->_validate();
 
 		// Get our original data so we can merge changes
 		$data = $this->original();
