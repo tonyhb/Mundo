@@ -88,19 +88,19 @@ Here's an example, which we will run through after the code:
 
 We've covered a lot in this code. You can see how the model is organised and how we denote embedded objects and documents. Here's a quick run-through:
 
-#### Embedded objects
+### Embedded objects
 
 Embedded objects are referenced using dot-notation, exactly the same way as in the Mongo shell. If you've got an address, you can define the state as `address.state` and apply rules in the same way.
 
 
-#### Embedded documents
+### Embedded documents
 
 If you want to save multiple embedded objects within a field (comments in a blog post, for example), just use the positional operator `$` as you would in the Mongo shell. The positonal operator tells Mundo that you can have many embedded objects within a field. 
 
 You apply validation rules the same way. Validation happens on each field in each embedded object recursively, so if you've got a comment and a user hasn't supplied their name in one of them validation will still throw an error.
 
 
-#### Array of values
+### Array of values
 
 If you've got an array of values (say, a list of names of people that liked a post) use the positional modifier `$` at the end of the field (for example, `comments.$.likes.$` to save `array('John', 'Michael', 'Emma')`).
 
@@ -108,18 +108,18 @@ If you've got an array of values (say, a list of names of people that liked a po
 Basic usage
 -----------
 
-#### Instantiating
+### Instantiating
 
 Once you've defined your model, you'll want to instantiate it to use it. To load a model, use the `Mundo::factory()` method like so:
 
 > $model = Mundo::factory('blogpost');
 
-You can also pass an array of `array('keys' => 'values')` as the second argument to automatically set data upon creation:
+This returns a new `Model_Blogpost`. You can also pass an array of key => values as the second argument to automatically set data upon creation:
 
-> $model = Mundo::factory('blogpost', $data);
+> $model = Mundo::factory('blogpost', array('keys' => 'values'));
 
 
-#### Setting data
+### Setting data
 
 There's a couple of ways you can do this; all of them have the same results. Jolly good. Here's the first - overloading properties:
 
@@ -129,16 +129,16 @@ Or using the set method:
 
 > $model->set('field', 'value');
 
-Or with an array of field => values (`array('field' => 'value', 'field_2' => 'value')`):
+Or with an array of field => values:
 
-> $model->set($data);
+> $model->set(array('field' => 'value', 'field_2' => 'value'));
 
 Setting a model always returns itself so you can chain and chain and chain, like so to atomically update:
 
 > $model->set('field', 'value')->update();
 
 
-#### Creating an object in Mongo
+### Creating an object in Mongo
 
 There's two ways to do this: calling `save()` to perform an upsert or calling `create()`. Frankly, I prefer `create()` because it won't overwrite anything if you accidentally have another object's MongoId in the data (yeah, I've done that in the past). Here's an example:
 
@@ -149,7 +149,7 @@ or:
 > $model->save(); // this upserts, which means it will create an object if it doesn't exist or update if it does.
 
 
-#### Saving and updating an object in Mongo
+### Saving and updating an object in Mongo
 
 There's two ways you can update an object's representation in the database, just like the mongo shell. You can `save()` to replace the current object or `update()` to perform atomic modifiers on the data. The second way is normally better. You've seens aving above (if not, it's in the 'creating an object' section), so lets talk about atomic updates.
 
@@ -178,7 +178,7 @@ You can see the last atomic operation by calling the `last_update()` respectivel
 Magic, huh?
 
 
-#### Loading an object from Mongo
+### Loading an object from Mongo
 
 Loading is much the same as any other ORM. You set model data (preferably indexed data such as the `_id` field) and run the `load()` method, like so:
 
@@ -206,7 +206,7 @@ This resets if you run `load()` and get the whole object. Cool, huh?
 
 
 Wrap-up
----
+-------
 
 That's the basics! Remember, it's not feature-complete. I want to add a find() method to query for many results, allow filtering of data when it's set (so we can automatically hyphenise slugs, for example) and allow extending objects beyond the `$_fields`.
 
