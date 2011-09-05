@@ -1103,6 +1103,7 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @covers Mundo_Object::load
 	 * @covers Mundo_Object::partial
 	 * @covers Mundo_Object::loaded
+	 * @covers Mundo_Object::save
 	 * @dataProvider provider_validate_and_create_data
 	 *
 	 * @param  array   $data   Data added to the database and available to query
