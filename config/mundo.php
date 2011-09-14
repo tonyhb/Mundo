@@ -31,8 +31,10 @@ return array(
 	 * @todo Allow replica sets and the like.
 	 **/
 
-	// The "Safe" value used for Mongo inserts with important information.
-	// See http://www.php.net/manual/en/mongocollection.insert.php
-	'mongo_safe'   => TRUE,
+	'query_options' => array(
+		'safe' => TRUE,
+		'fsync' => FALSE,
+		'timeout' => 20000, // Default driver timeout of 20 secods.
+	),
 
 ) + $enviromnent_settings;

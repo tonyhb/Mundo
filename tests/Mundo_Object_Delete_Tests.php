@@ -33,7 +33,7 @@ class Mundo_Object_Delete_Tests extends PHPUnit_Framework_TestCase {
 	 * Remove our test database we played witj
 	 *
 	 * @test
-	 * @covers Model_Object::delete
+	 * @covers Mundo_Object::delete
 	 *
 	 * @return void
 	 */
@@ -91,7 +91,7 @@ class Mundo_Object_Delete_Tests extends PHPUnit_Framework_TestCase {
 
 		$this->assertTrue($model->loaded());
 
-		$data = $model->delete();
+		$model->delete();
 
 		$loading = new Model_Blogpost;
 
@@ -107,7 +107,7 @@ class Mundo_Object_Delete_Tests extends PHPUnit_Framework_TestCase {
 	 * over data from the get method.
 	 *
 	 * @test
-	 * @covers Model_Object::delete
+	 * @covers Mundo_Object::delete
 	 *
 	 * @return void
 	 */

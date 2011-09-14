@@ -996,7 +996,6 @@ class Mundo_Object_Tests extends PHPUnit_Framework_TestCase {
 	 * @covers Mundo_Object::loaded
 	 * @covers Mundo_Object::changed
 	 * @covers Mundo_Object::original
-	 * @covers Mundo_Object::_init_db
 	 * @covers Mundo_Object::load
 	 * @covers Mundo_Object::validate
 	 * @covers Mundo_Object::_validate
