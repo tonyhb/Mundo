@@ -36,15 +36,6 @@ class Mundo_Core
 	public static $db;
 
 	/**
-	 * The Mundo config file.
-	 *
-	 * This file is loaded the first time a Mundo_Object is instantiated.
-	 *
-	 * @var Object
-	 */
-	public static $config;
-
-	/**
 	 * Return a Mundo_Object class with some initial $data.
 	 *
 	 * @return  Mundo_Object
@@ -54,17 +45,13 @@ class Mundo_Core
 	{
 		if ( ! self::$mongo instanceof Mongo)
 		{
-			// Initialise our config, mongo and DB static variables with the first mundo_object instance
-			self::$config = Kohana::$config->load('Mundo');
+			$config = Kohana::$config->load('Mundo');
 
 			// Connect to the database
-			self::$mongo = new Mongo();
-
-			// Get the default DB from our config file
-			$database = self::$config->database;
+			self::$mongo = new Mongo($config->servers, $config->connect_options);
 
 			// Connect to the default DB
-			self::$db = self::$mongo->$database;
+			self::$db = self::$mongo->{$config->database};
 		}
 
 		// String typecast

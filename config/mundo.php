@@ -27,10 +27,11 @@ switch(Kohana::$environment)
 
 return array(
 
-	/**
-	 * @todo Allow replica sets and the like.
-	 **/
-
+	'servers' => 'mongodb://localhost:27017', // @see http://www.php.net/manual/en/mongo.construct.php
+	'connect_options' => array(
+		'connect' => TRUE,
+		// 'replicaSet' => 'setName',
+	),
 	'query_options' => array(
 		'safe' => TRUE,
 		'fsync' => FALSE,
