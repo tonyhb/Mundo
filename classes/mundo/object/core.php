@@ -715,6 +715,8 @@ class Mundo_Object_Core
 
 		if ($result = $this->_collection->findOne($query, $fields))
 		{
+			// Only set the data, _loaded and _partial if the load was a success
+
 			if ( ! empty($fields))
 			{
 				// Merge returned fields with data we queried with
@@ -731,17 +733,17 @@ class Mundo_Object_Core
 
 			// Reset our changed array
 			$this->_changed = array();
-		}
 
-		if (empty($fields))
-		{
-			// We loaded the full object from the database
-			$this->_partial = FALSE;
-		}
-		else
-		{
-			// We loaded only partial fields.
-			$this->_partial = TRUE;
+			if (empty($fields))
+			{
+				// We loaded the full object from the database
+				$this->_partial = FALSE;
+			}
+			else
+			{
+				// We loaded only partial fields.
+				$this->_partial = TRUE;
+			}
 		}
 
 		return $this;
@@ -931,6 +933,37 @@ class Mundo_Object_Core
 		);
 	}
 
+	/**
+	 * Deletes documents from the collection. This uses data from the 
+	 * {@link get()} method as the query, or can use data passed in the
+	 * method's argument as the query.
+	 *
+	 * @param  array  Data to use as the database query
+	 * @param  array  Array of options as used in MongoCollection::remove().
+	 *                These will overwrite any options set in the config.
+	 *                  !! This is currently unimplemented
+	 *
+	 * @see    get()
+	 * @link   http://www.php.net/manual/en/mongocollection.remove.php
+	 *
+	 * @return mixed  Returns the same as MongoCollection::remove(),
+	 *                depending on the safe setting
+	 **/
+	public function delete($query = array(), $options = array())
+	{
+		if (empty($query))
+		{
+			$query = $this->get();
+		}
+
+		// Initialise our database
+		$this->_init_db();
+
+		/**
+		 * @todo Use options throughout Mundo!
+		 */
+		return $this->_collection->remove($query, array('safe' => $this->_safe));
+	}
 	/**
 	 * Helper function for database interction methods.
 	 *
