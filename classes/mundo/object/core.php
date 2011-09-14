@@ -44,29 +44,6 @@ class Mundo_Object_Core
 	protected $_filters;
 
 	/**
-	 * Our Mongo class
-	 *
-	 * @var  Mongo
-	 * @see  http://www.php.net/manual/en/class.mongo.php
-	 */
-	protected $_mongo;
-
-	/**
-	 * Our MongoDB class
-	 *
-	 * @var  MongoDB
-	 * @see  http://www.php.net/manual/en/class.mongodb.php
-	 */
-	protected $_db;
-
-	/**
-	 * The "safe" parameter for DB queries
-	 *
-	 * @var  mixed
-	 */
-	protected $_safe;
-
-	/**
 	 * This is a container for the object's saved data
 	 *
 	 * @var array
@@ -134,6 +111,9 @@ class Mundo_Object_Core
 
 		// Set our data
 		$this->set($data);
+
+		// Set the _collection property to a MongoCollection
+		$this->_collection = Mundo::$db->{$this->_collection};
 	}
 
 	/**
@@ -710,11 +690,10 @@ class Mundo_Object_Core
 			$query = $this->get();
 		}
 
-		// Initialise our database
-		$this->_init_db();
-
 		if ($result = $this->_collection->findOne($query, $fields))
 		{
+			// Only set the data, _loaded and _partial if the load was a success
+
 			if ( ! empty($fields))
 			{
 				// Merge returned fields with data we queried with
@@ -731,17 +710,17 @@ class Mundo_Object_Core
 
 			// Reset our changed array
 			$this->_changed = array();
-		}
 
-		if (empty($fields))
-		{
-			// We loaded the full object from the database
-			$this->_partial = FALSE;
-		}
-		else
-		{
-			// We loaded only partial fields.
-			$this->_partial = TRUE;
+			if (empty($fields))
+			{
+				// We loaded the full object from the database
+				$this->_partial = FALSE;
+			}
+			else
+			{
+				// We loaded only partial fields.
+				$this->_partial = TRUE;
+			}
 		}
 
 		return $this;
@@ -750,11 +729,12 @@ class Mundo_Object_Core
 	/**
 	 * Creates a new document in our collection
 	 *
+	 * @param   array  Array of options for the MongoCollection::insert method
 	 * @return  mixed  Same as MongoCollection::insert (@see 
 	 *                 http://php.net/manual/en/mongocollection.insert.php)
 	 * @throws  mixed  Validation_Exception, Mundo_Exception
 	 */
-	public function create()
+	public function create($options = array())
 	{
 		if ($this->_loaded == TRUE)
 		{
@@ -764,14 +744,14 @@ class Mundo_Object_Core
 		// Ensure our data is valid
 		$this->_validate();
 
-		// Intiialise our database
-		$this->_init_db();
-
 		// Merge our existing data and changed data
 		$data = $this->_merge();
 
+		// Merge the default options with user provided ones, if necessary
+		$options = Arr::merge(Kohana::$config->load('Mundo')->query_options, $options);
+
 		// Insert our data
-		$return = $this->_collection->insert($data, array('safe' => $this->_safe));
+		$return = $this->_collection->insert($data, $options);
 
 		$this->_clean_up($data);
 
@@ -781,9 +761,10 @@ class Mundo_Object_Core
 	/**
 	 * Saves model data using the MongoCollection::save driver method
 	 *
+	 * @param  array  Array of options for the MongoCollection::save method
 	 * @return $this
 	 **/
-	public function save()
+	public function save($options = array())
 	{
 		// If we have no changed data why bother?
 		if ( ! $this->changed())
@@ -809,9 +790,10 @@ class Mundo_Object_Core
 			Arr::set_path($data, $field, $value);
 		}
 
-		// Connect to and query the collection
-		$this->_init_db();
-		$this->_collection->save($data, array('safe' => $this->_safe));
+		// Merge the default options with user provided ones, if necessary
+		$options = Arr::merge(Kohana::$config->load('Mundo')->query_options, $options);
+
+		$this->_collection->save($data, $options);
 
 		$this->_clean_up($data);
 
@@ -822,9 +804,13 @@ class Mundo_Object_Core
 	 * Atomically updates the document according to data in the changed
 	 * property.
 	 *
+	 *  !! NOTE: This operation does not support upserts, even if you
+	 *           include it in $options.
+	 *
+	 * @param   array  Array of options for the MongoCollection::update method
 	 * @returns bool whether the update was successful or not
 	 */
-	public function update()
+	public function update($options = array())
 	{
 		// If this isn't loaded fail
 		if ( ! $this->loaded())
@@ -839,13 +825,14 @@ class Mundo_Object_Core
 		// Validate our data
 		$this->_validate();
 
-		$this->_init_db();
-
 		// Put our modifier query into a variable
 		$update = $this->next_update();
 
+		// Merge the default options with user provided ones, if necessary
+		$options = Arr::merge(Kohana::$config->load('Mundo')->query_options, $options);
+
 		// Update using our $id
-		$status = $this->_collection->update(array('_id' => $this->get('_id')), $update, array('safe' => $this->_safe));
+		$status = $this->_collection->update(array('_id' => $this->get('_id')), $update, $options);
 
 		// Get our original data so we can merge changes
 		$data = $this->original();
@@ -932,6 +919,34 @@ class Mundo_Object_Core
 	}
 
 	/**
+	 * Deletes documents from the collection. This uses data from the 
+	 * {@link get()} method as the query, or can use data passed in the
+	 * method's argument as the query.
+	 *
+	 * @param  array  Data to use as the database query
+	 * @param  array  Array of options as used in MongoCollection::remove().
+	 *                These will overwrite any options set in the config.
+	 *                  !! This is currently unimplemented
+	 *
+	 * @see    get()
+	 * @link   http://www.php.net/manual/en/mongocollection.remove.php
+	 *
+	 * @return mixed  Returns the same as MongoCollection::remove(),
+	 *                depending on the safe setting
+	 **/
+	public function delete($query = array(), $options = array())
+	{
+		if (empty($query))
+		{
+			$query = $this->get();
+		}
+
+		// Merge the default options with user provided ones, if necessary
+		$options = Arr::merge(Kohana::$config->load('Mundo')->query_options, $options);
+
+		return $this->_collection->remove($query, $options);
+	}
+	/**
 	 * Helper function for database interction methods.
 	 *
 	 * This is the model cleanup process after successful communication
@@ -953,37 +968,6 @@ class Mundo_Object_Core
 
 		// We're now loaded
 		$this->_loaded = TRUE;
-	}
-	/**
-	 * Connect to Mongo for queries
-	 *
-	 * @return self 
-	 */
-	protected function _init_db()
-	{
-
-		if ($this->_mongo instanceof Mongo AND $this->_db instanceof MongoDB AND $this->_collection instanceof MongoCollection)
-		{
-			// Our database is already initialised
-			return $this;
-		}
-
-		// Get our configuration information
-		$config = Kohana::$config->load("mundo");
-
-		// Load and connect to mongo
-		$this->_mongo = new Mongo();
-
-		// Select our database
-		$this->_db = $this->_mongo->{$config->database};
-
-		// Set our safety settings
-		$this->_safe = $config->mongo_safe;
-
-		// Load our selected collection using the same variable as our collection name.
-		$this->_collection = $this->_db->{$this->_collection};
-
-		return $this;
 	}
 
 } // End Mundo_Object_Core

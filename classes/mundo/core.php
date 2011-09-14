@@ -2,7 +2,7 @@
 
 /**
  * Base functions for Mundo. This class handles creation of models as well
- * as standard validation and conversion functions for models.
+ * as standard validation and conversion tests for models.
  *
  * @package Mundo
  * @author Tony Holdstock-Brown
@@ -14,6 +14,28 @@ class Mundo_Core
 	const DESC = -1;
 
 	/**
+	 * The Mongo class which handles database connections.
+	 *
+	 * This is initialised the first time a Mundo_Object is instantiated.
+	 *
+	 * @var Mongo
+	 */
+	public static $mongo;
+
+	/**
+	 * The database all documents and collections are written to.
+	 *
+	 * This is initialised the first time a Mundo_Object is instantiated.
+	 *
+	 * This can be changed before a Mundo_Object is instantiated
+	 * to write to a different different to the default; only if you wanted
+	 * to separate data by database.
+	 *
+	 * @var MongoDB
+	 */
+	public static $db;
+
+	/**
 	 * Return a Mundo_Object class with some initial $data.
 	 *
 	 * @return  Mundo_Object
@@ -21,9 +43,20 @@ class Mundo_Core
 	 **/
 	public static function factory($model, $data = array())
 	{
+		if ( ! self::$mongo instanceof Mongo)
+		{
+			$config = Kohana::$config->load('Mundo');
+
+			// Connect to the database
+			self::$mongo = new Mongo($config->servers, $config->connect_options);
+
+			// Connect to the default DB
+			self::$db = self::$mongo->{$config->database};
+		}
+
 		// String typecast
 		$model = (string) $model;
-		
+
 		$model = 'Model_'.$model;
 
 		return new $model($data);
