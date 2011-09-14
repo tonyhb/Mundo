@@ -13,9 +13,17 @@ There's example usage in the tests folder and the code is well commented (hopefu
 
 
 Basic setup
------------
+===========
 
-In Mundo, each of your collections are mapped to separate models `Mundo_Object` class. In it, you define the collection's fields (`private $_fields`) and any validation you want to happen on these fields (`protected $_validation`) using Kohana's validation library.
+Database
+--------
+
+You can choose which Mongo servers, replica sets and databases you connect to in the Mundo configuration file. This follows suit with the official PHP driver, using exactly the same parameters.
+
+Models
+------
+
+In Mundo, each of your collections are mapped to separate models using the `Mundo_Object` class. In it, you define the collection's fields (`private $_fields`) and any validation you want to happen on these fields (`protected $_validation`) using Kohana's validation library.
 
 Here's an example, which we will run through after the code:
 
@@ -46,39 +54,39 @@ Here's an example, which we will run through after the code:
 
 		protected $_rules = array(
 
-			'post_title' => array( 
+			'post_title' =    array( 
 				array('not_empty'), // These methods are set in the Valid class, though you can use the same syntax as the Validation library to call your own functions.
 			),
-			'post_slug' => array(
+			'post_slug' =    array(
 				array('alpha_dash', array(':value', TRUE)), // The first array value is the method name, the second is an array of paramters.
 				array('not_empty'),
 			),
-			'post_date' => array(
+			'post_date' =    array(
 				array('Mundo::instance_of', array(':value', 'MongoDate')), // Mundo comes with an instanceof static method to ensure we insert correct Mongo classes.
 				array('not_empty'),
 			),
-			'author' => array(
+			'author' =    array(
 				array('Mundo::instance_of', array(':value', 'MongoId')),
 				array('not_empty'),
 			),
 			),
-			'comments.$.author_name' => array(
+			'comments.$.author_name' =    array(
 				array('not_empty'),
 			),
-			'comments.$.author_email' => array(
+			'comments.$.author_email' =    array(
 				array('not_empty'),
 				array('email'),
 			),
-			'comments.$.likes.$' => array(
+			'comments.$.likes.$' =    array(
 				array('regex', array(':value', '/^[\w\s]+$/')),
 			),
-			'comments.$.like_count' => array(
+			'comments.$.like_count' =    array(
 				array('numeric'),
 			),
-			'post_metadata.keywords' => array(
+			'post_metadata.keywords' =    array(
 				array('not_empty'),
 			),
-			'post_metadata.description' => array(
+			'post_metadata.description' =    array(
 				array('not_empty'),
 			),
 		);
@@ -106,54 +114,58 @@ If you've got an array of values (say, a list of names of people that liked a po
 
 
 Basic usage
------------
+===========
 
-### Instantiating
+Instantiating
+-------------
 
-Once you've defined your model, you'll want to instantiate it to use it. To load a model, use the `Mundo::factory()` method like so:
+Once you've defined your model, you'll want to instantiate it to use it. You must *always* use use the `Mundo::factory()` method like so:
 
-> $model = Mundo::factory('blogpost');
+    $model = Mundo::factory('blogpost');
 
-This returns a new `Model_Blogpost`. You can also pass an array of key => values as the second argument to automatically set data upon creation:
+This returns a new `Model_Blogpost`. You can also pass an array of key =    values as the second argument to automatically set data upon creation:
 
-> $model = Mundo::factory('blogpost', array('keys' => 'values'));
+    $model = Mundo::factory('blogpost', array('keys' =    'values'));
 
 
-### Setting data
+Setting data
+------------
 
 There's a couple of ways you can do this; all of them have the same results. Jolly good. Here's the first - overloading properties:
 
-> $model->field = 'value';
+    $model->field = 'value';
 
 Or using the set method:
 
-> $model->set('field', 'value');
+    $model->set('field', 'value');
 
-Or with an array of field => values:
+Or with an array of field =    values:
 
-> $model->set(array('field' => 'value', 'field_2' => 'value'));
+    $model->set(array('field' =    'value', 'field_2' =    'value'));
 
 Setting a model always returns itself so you can chain and chain and chain, like so to atomically update:
 
-> $model->set('field', 'value')->update();
+    $model->set('field', 'value')->update();
 
 
-### Creating an object in Mongo
+Creating a document
+-------------------
 
 There's two ways to do this: calling `save()` to perform an upsert or calling `create()`. Frankly, I prefer `create()` because it won't overwrite anything if you accidentally have another object's MongoId in the data (yeah, I've done that in the past). Here's an example:
 
-> $model->create();
+    $model->create();
 
 or:
 
-> $model->save(); // this upserts, which means it will create an object if it doesn't exist or update if it does.
+    $model->save(); // this upserts, which means it will create an object if it doesn't exist or update if it does.
 
 
-### Saving and updating an object in Mongo
+Saving and updating a document
+------------------------------
 
 There's two ways you can update an object's representation in the database, just like the mongo shell. You can `save()` to replace the current object or `update()` to perform atomic modifiers on the data. The second way is normally better. You've seens aving above (if not, it's in the 'creating an object' section), so lets talk about atomic updates.
 
-*Atomic operations*
+### Atomic operations
 
 The following atomic operations are supported: `$set`, `$inc`, `$unset`, `$pushAll` and `$popAll` (the last two remove the need for `$push` and `$pop`).
 
@@ -161,24 +173,25 @@ Atomic updates are made by default when using any of the set methods for `$set`,
 
 To use `$pushAll` and `$popAll`, use the `push()` and `pop()` methods:
 
-> $model->push('field', $array...); // You can supply an endless number of arrays as arguments to push to the model. Neato!
+    $model->push('field', $array...); // You can supply an endless number of arrays as arguments to push to the model. Neato!
 
-> $value = $model->pop('field');
+    $value = $model->pop('field');
 
 You can see what the next atomic update query will be by calling the `next_update()` method:
 
-> $atomic_operation = $model->next_query();
+    $atomic_operation = $model->next_query();
 
 This is useful because sometimes you might make queries that have conflicting mods and you'll need to debug.
 
 You can see the last atomic operation by calling the `last_update()` respectively:
 
-> $last_atomic_operation = $model->last_query();
+    $last_atomic_operation = $model->last_query();
 
 Magic, huh?
 
 
-### Loading an object from Mongo
+Loading a document
+------------------
 
 Loading is much the same as any other ORM. You set model data (preferably indexed data such as the `_id` field) and run the `load()` method, like so:
 
@@ -200,10 +213,11 @@ You can choose to return a subset of fields from Mongo too. Just pass an array t
 
 If you do choose to load just a few fields from the whole object, Mundo will set the model's state to partially loaded. This means you won't be able to run the `save()` method and overwrite your entire object with just the few fields you're working with. You can check if your model is partially loaded by running:
 
-> $partial = $model->partial(); // TRUE if you've returned a subset of fields, FALSE if you have the whole object
+    $partial = $model->partial(); // TRUE if you've returned a subset of fields, FALSE if you have the whole object
 
 This resets if you run `load()` and get the whole object. Cool, huh?
 
+Deleting a 
 
 Wrap-up
 -------
