@@ -1,6 +1,19 @@
 Changelog
 ---------
 
+### Version 0.5.4 (30th September 2011)
+
+* Fixing load() bug where queries weren't being flattened before being sent to MongoDB. This stopped us reaching into objects.
+
+### Version 0.5.3 (15th September 2011)
+
+* Added support for Mongo authentication
+* Added support for Mongo replica sets
+* Added support for fsync checking when writing data
+* Added support for custom timeout argument when writing data
+* Added the ability to delete documents from a collection
+* Fixing load() bug in which the _partial variable was incorrectly being set
+
 ### Version 0.5.2 (5th September 2011)
 
 * Added the ability to retrieve a subset of fields with the load() method.

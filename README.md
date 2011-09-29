@@ -37,14 +37,14 @@ Here's an example, which we will run through after the code:
 			'post_title',
 			'post_slug',
 			'post_date',
-			'author', // A reference to another collection's ObjectID
+			'author', // This will be a reference to another collection's ObjectID
 			'author_name', // Denormalisation is a good thing with NoSQL (in general).
 			'author_email', 
 			'post_excerpt',
 			'post_content',
 			'post_metadata.keywords', // Use dot notation to illustrate embedded objects
 			'post_metadata.description',
-			'comments.$.comment', // The positional operator ($) denotes multiple embedded objects or collections
+			'comments.$.comment', // The positional operator ($) denotes multiple embedded objects
 			'comments.$.author_name',
 			'comments.$.author_url',
 			'comments.$.author_email',
@@ -123,9 +123,9 @@ Once you've defined your model, you'll want to instantiate it to use it. You mus
 
     $model = Mundo::factory('blogpost');
 
-This returns a new `Model_Blogpost`. You can also pass an array of key =    values as the second argument to automatically set data upon creation:
+This returns a new `Model_Blogpost`. You can also pass an array of key => values as the second argument to automatically set data upon creation:
 
-    $model = Mundo::factory('blogpost', array('keys' =    'values'));
+    $model = Mundo::factory('blogpost', array('keys' => 'values'));
 
 
 Setting data
@@ -141,11 +141,19 @@ Or using the set method:
 
 Or with an array of field =    values:
 
-    $model->set(array('field' =    'value', 'field_2' =    'value'));
+    $model->set(array('field' => 'value', 'field_2' => 'value'));
 
 Setting a model always returns itself so you can chain and chain and chain, like so to atomically update:
 
     $model->set('field', 'value')->update();
+
+Setting embedded data is easy, too:
+
+    $model->set('post_metadata.keywords', 'foo, bar');
+
+Or:
+
+    $model->('post_metadata.keywords'} = 'foo, bar, bas';
 
 
 Creating a document
@@ -217,7 +225,15 @@ If you do choose to load just a few fields from the whole object, Mundo will set
 
 This resets if you run `load()` and get the whole object. Cool, huh?
 
-Deleting a 
+Deleting a document
+-------------------
+
+Since Mundo 0.5.3 you can delete a document from a collection. To do this use the `delete()` method:
+
+    $model->delete();
+
+Note that if you have no data in your model this can (and will) remove every object from your collection! Nasty. It might be prudent to ensure you've not got an empty data from `get()` before you call this method, eh.
+
 
 Wrap-up
 -------
