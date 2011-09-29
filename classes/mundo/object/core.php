@@ -686,8 +686,9 @@ class Mundo_Object_Core
 		}
 		else
 		{
-			// Use all recent data as our query. You should use either the _id or indexed keys here.
-			$query = $this->get();
+			// Use all recent data as our query. You should use indexed keys here.
+			// Note that this is flattened so we can query into objects
+			$query = Mundo::flatten($this->get());
 		}
 
 		if ($result = $this->_collection->findOne($query, $fields))
