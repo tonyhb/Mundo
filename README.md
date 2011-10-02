@@ -3,13 +3,14 @@ Mundo
 
 Mundo is a mapping system written for the MongoDB Database and the [Kohana Framework](http://kohanaframework.org/).
 
-It's currently in alpha - just released - and can do the following:
+It's currently in beta and can do the following:
 
 * Validate model data (including embedded objects and collections)
 * Provide an object for the model's state and data
 * Automatically update collections using atomic operations where possible
+* Allow both schema and schema-less mapping with minimal hassle
 
-There's example usage in the tests folder and the code is well commented (hopefully). The unit test provides 100% coverage but it's not quite comprehensive. Of course, if you find a bug or have an idea please do make a new issue. I'd love to hear your feedback!
+There's example usage in the tests folder and the code is well commented (hopefully). The unit test provides 100% coverage but it's not quite comprehensive. Of course, if you find a bug or have an idea please do make a new issue.
 
 
 Basic setup
@@ -29,6 +30,7 @@ Here's an example, which we will run through after the code:
 
 	class Model_Blogpost extends Mundo_Object
 	{
+		protected $_extensible = FALSE; // Setting this to TRUE allows you to write to and read fields not defined in the $_fields variable
 
 		protected $_collection = 'posts'; // This is the name of the collection in Mongo		
 
@@ -54,39 +56,39 @@ Here's an example, which we will run through after the code:
 
 		protected $_rules = array(
 
-			'post_title' =    array( 
+			'post_title' => array( 
 				array('not_empty'), // These methods are set in the Valid class, though you can use the same syntax as the Validation library to call your own functions.
 			),
-			'post_slug' =    array(
+			'post_slug' => array(
 				array('alpha_dash', array(':value', TRUE)), // The first array value is the method name, the second is an array of paramters.
 				array('not_empty'),
 			),
-			'post_date' =    array(
+			'post_date' => array(
 				array('Mundo::instance_of', array(':value', 'MongoDate')), // Mundo comes with an instanceof static method to ensure we insert correct Mongo classes.
 				array('not_empty'),
 			),
-			'author' =    array(
+			'author' => array(
 				array('Mundo::instance_of', array(':value', 'MongoId')),
 				array('not_empty'),
 			),
 			),
-			'comments.$.author_name' =    array(
+			'comments.$.author_name' => array(
 				array('not_empty'),
 			),
-			'comments.$.author_email' =    array(
+			'comments.$.author_email' => array(
 				array('not_empty'),
 				array('email'),
 			),
-			'comments.$.likes.$' =    array(
+			'comments.$.likes.$' => array(
 				array('regex', array(':value', '/^[\w\s]+$/')),
 			),
-			'comments.$.like_count' =    array(
+			'comments.$.like_count' => array(
 				array('numeric'),
 			),
-			'post_metadata.keywords' =    array(
+			'post_metadata.keywords' => array(
 				array('not_empty'),
 			),
-			'post_metadata.description' =    array(
+			'post_metadata.description' => array(
 				array('not_empty'),
 			),
 		);
@@ -112,6 +114,10 @@ You apply validation rules the same way. Validation happens on each field in eac
 
 If you've got an array of values (say, a list of names of people that liked a post) use the positional modifier `$` at the end of the field (for example, `comments.$.likes.$` to save `array('John', 'Michael', 'Emma')`).
 
+### Schema-less mapping
+
+If you want the flexibility that NoSQL provides and don't want to have to map out your fields, versions upwards of 0.6 allow schema-less mapping. Just set the `$_extendable` variable to TRUE and you can add, edit and atomically update fields on the go. Note that unmapped fields cannot have validation rules applied to them, so that's up to you.
+
 
 Basic usage
 ===========
@@ -119,7 +125,7 @@ Basic usage
 Instantiating
 -------------
 
-Once you've defined your model, you'll want to instantiate it to use it. You must *always* use use the `Mundo::factory()` method like so:
+Once you've defined your model, you'll want to instantiate it to use it. You should always use use the `Mundo::factory()` method like so:
 
     $model = Mundo::factory('blogpost');
 
@@ -139,7 +145,7 @@ Or using the set method:
 
     $model->set('field', 'value');
 
-Or with an array of field =    values:
+Or with an array of field => values:
 
     $model->set(array('field' => 'value', 'field_2' => 'value'));
 
@@ -159,7 +165,7 @@ Or:
 Creating a document
 -------------------
 
-There's two ways to do this: calling `save()` to perform an upsert or calling `create()`. Frankly, I prefer `create()` because it won't overwrite anything if you accidentally have another object's MongoId in the data (yeah, I've done that in the past). Here's an example:
+There's two ways to do this: calling `save()` to perform an upsert or calling `create()`. The `create()` method is generally better because it won't overwrite anything if you accidentally have another object's MongoId in the data. Here's an example:
 
     $model->create();
 
