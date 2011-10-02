@@ -70,5 +70,92 @@ class Mundo_Extensibility_Tests extends PHPUnit_Framework_TestCase {
 				'author' => 'John Smith'
 			),
 		), $model->next_update());
+
+		$model->save();
+
+		$this->assertTrue($model->loaded());
+		$this->assertTrue($model->get('_id') instanceof MongoId);
+	}
+
+	/**
+	 * Ensures you can push to an undefined field
+	 *
+	 * @test
+	 * @return void
+	 */
+	public function test_pushing_to_undefined_array()
+	{
+		$model = new Model_Page;
+
+		$model->push('comments', array('comment' => 'one'), array('comment' => 'two'));
+
+		$this->assertEquals(array(
+			'comments' => array(
+				array('comment' => 'one'),
+				array('comment' => 'two'),
+			)
+		), $model->get());
+	}
+
+	/**
+	 * Ensures you can unset an undefined field which has already been set
+	 *
+	 * @test
+	 * @return void
+	 */
+	public function test_unsetting_previously_set_undefined_field()
+	{
+		$model = new Model_Page;
+
+		$model->set(array(
+			'name' => 'Page name',
+			'slug' => 'page-slug',
+			'author' => 'John Smith',
+		));
+
+		$this->assertEquals(array(
+			'name' => 'Page name',
+			'slug' => 'page-slug',
+			'author' => 'John Smith',
+		), $model->get());
+
+		$this->assertEquals(array(
+			'$set' => array(
+				'name' => 'Page name',
+				'slug' => 'page-slug',
+				'author' => 'John Smith'
+			),
+		), $model->next_update());
+
+		$model->unset_atomic('author');
+
+		$this->assertEquals(array(
+			'name' => 'Page name',
+			'slug' => 'page-slug',
+		), $model->get());
+
+		$this->assertEquals(array(
+			'$set' => array(
+				'name' => 'Page name',
+				'slug' => 'page-slug',
+			),
+		), $model->next_update());
+
+		$model->save();
+
+		$this->assertTrue($model->loaded());
+		$this->assertTrue($model->get('_id') instanceof MongoId);
+
+		$id = $model->get('_id');
+
+		unset($model);
+
+		$model = new Model_Page;
+
+		$model->set('_id', $id);
+
+		$model->load();
+
+		$this->assertTrue($model->loaded());
 	}
 }
