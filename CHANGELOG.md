@@ -1,6 +1,11 @@
 Changelog
 ---------
 
+### Version 0.6 (2 October 2011)
+
+* Adding functionality for schema-less mapping
+* Adding version numbers to Mundo_Core.php
+
 ### Version 0.5.4 (30th September 2011)
 
 * Fixing load() bug where queries weren't being flattened before being sent to MongoDB. This stopped us reaching into objects.
