@@ -39,9 +39,18 @@ class Mundo_Object_Core
 	/**
 	 * An array of filters which are ran when setting data.
 	 *
+	 * !! This is unimplemented
+	 *
 	 * @var array
 	 */
 	protected $_filters;
+
+	/**
+	 * Whether or not you can set fields not defined in $_fields
+	 *
+	 * @var bool;
+	 */
+	protected $_extensible = FALSE;
 
 	/**
 	 * This is a container for the object's saved data
@@ -397,6 +406,9 @@ class Mundo_Object_Core
 	 */
 	protected function _check_field_exists($field)
 	{
+		if ($this->_extensible)
+			return TRUE;
+
 		// Replace any positional modifier keys with '$'
 		$field = preg_replace('#\.[0-9]+#', '.$', $field);
 
