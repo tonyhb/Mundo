@@ -1,6 +1,10 @@
 Changelog
 ---------
 
+### Version 0.6.1 (2 October 2011)
+
+* Fixing glaringly obvious mistake in the README file.
+
 ### Version 0.6 (2 October 2011)
 
 * Adding functionality for schema-less mapping

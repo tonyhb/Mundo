@@ -24,7 +24,7 @@ You can choose which Mongo servers, replica sets and databases you connect to in
 Models
 ------
 
-In Mundo, each of your collections are mapped to separate models using the `Mundo_Object` class. In it, you define the collection's fields (`private $_fields`) and any validation you want to happen on these fields (`protected $_validation`) using Kohana's validation library.
+In Mundo, each of your collections are mapped to separate models using the `Mundo_Object` class. In it, you define the collection's fields (`protected $_fields`) and any validation you want to happen on these fields (`protected $_validation`) using Kohana's validation library.
 
 Here's an example, which we will run through after the code:
 
@@ -116,7 +116,7 @@ If you've got an array of values (say, a list of names of people that liked a po
 
 ### Schema-less mapping
 
-If you want the flexibility that NoSQL provides and don't want to have to map out your fields, versions upwards of 0.6 allow schema-less mapping. Just set the `$_extendable` variable to TRUE and you can add, edit and atomically update fields on the go. Note that unmapped fields cannot have validation rules applied to them, so that's up to you.
+If you want the flexibility that NoSQL provides and don't want to have to map out your fields, versions upwards of 0.6 allow schema-less mapping. Just set the `$_extensible` variable to TRUE and you can add, edit and atomically update fields on the go. Note that unmapped fields cannot have validation rules applied to them, so that's up to you.
 
 
 Basic usage
@@ -159,7 +159,7 @@ Setting embedded data is easy, too:
 
 Or:
 
-    $model->('post_metadata.keywords'} = 'foo, bar, bas';
+    $model->('post_metadata.keywords') = 'foo, bar, bas';
 
 
 Creating a document
