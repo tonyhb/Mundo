@@ -1,6 +1,10 @@
 Changelog
 ---------
 
+### Version 0.6.2 (3 October 2011)
+
+* Sometimes the author codes drunk
+
 ### Version 0.6.1 (2 October 2011)
 
 * Fixing glaringly obvious mistake in the README file.
