@@ -1,6 +1,10 @@
 Changelog
 ---------
 
+### Version 0.6.3 (4 October 2011)
+
+* Added support for schema-less embedded objects as opposed to the whole object
+
 ### Version 0.6.2 (3 October 2011)
 
 * Sometimes the author codes drunk
