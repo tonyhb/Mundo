@@ -30,7 +30,7 @@ Here's an example, which we will run through after the code:
 
 	class Model_Blogpost extends Mundo_Object
 	{
-		protected $_extensible = FALSE; // Setting this to TRUE allows you to write to and read fields not defined in the $_fields variable
+		protected $_schemaless = FALSE; // Setting this to TRUE allows you to write to and read fields not defined in the $_fields variable
 
 		protected $_collection = 'posts'; // This is the name of the collection in Mongo		
 
@@ -116,7 +116,14 @@ If you've got an array of values (say, a list of names of people that liked a po
 
 ### Schema-less mapping
 
-If you want the flexibility that NoSQL provides and don't want to have to map out your fields, versions upwards of 0.6 allow schema-less mapping. Just set the `$_extensible` variable to TRUE and you can add, edit and atomically update fields on the go. Note that unmapped fields cannot have validation rules applied to them, so that's up to you.
+If you want the flexibility that NoSQL provides and don't want to have to map out your fields, versions upwards of 0.6 allow schema-less mapping. Just set the `$_schemaless` variable to TRUE and you can add, edit and atomically update fields on the go. Note that unmapped fields cannot have validation rules applied to them, so that's up to you.
+
+If you only want schema-less embedded collections, you can set the `$_schemaless` in exactly the same way as `$_fields`:
+
+	protected $_schemaless = array(
+		'metadata', // This allows a single embedded object (ie metadata.created_on, metadata.keywords etc.)
+		'comments.$ // This allows an array of embedded objects (ie comments.0.comment, comments.1.comment, comments.1.votes)
+	);
 
 
 Basic usage

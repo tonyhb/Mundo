@@ -20,7 +20,7 @@ class Model_Page extends Mundo_Object
 	 */
 	protected $_collection = 'pages';
 
-	protected $_extensible = TRUE;
+	protected $_schemaless = TRUE;
 
 	/**
 	 * These are the fields, or key names, that we store in our collection.
