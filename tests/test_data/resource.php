@@ -38,7 +38,8 @@ class Model_Resource extends Mundo_Object
 	 *            of extensible fields
 	 */
 	protected $_extensible = array(
-		'content.$',
+		'metadata', // Allow a single embedded collection with unmapped schema (ie metadata.author, metadata.date etc)
+		'comments.$', // Allow multiple embedded collections each with unmapped schema (ie comments.0.author, comments.1.author etc...)
 	);
 
 	/**
@@ -54,7 +55,8 @@ class Model_Resource extends Mundo_Object
 		'_id',
 		'type',
 		'name',
-		'content.$',
+		'metadata',
+		'comments.$',
 	);
 
 	/**
@@ -67,13 +69,10 @@ class Model_Resource extends Mundo_Object
 	 * @var array
 	 */
 	protected $_rules = array(
-		// You do NOT need to specify that the '_id' field is an instance of MongoID.
-
-		'name' => array( // This array lists the rules that apply to the post_title field
-			array('not_empty'), // These methods are set in the Valid class, though you can use the same syntax as the Validation library to call your own functions.
+		'type' => array(
+			array('not_empty'),
 		),
-		'slug' => array(
-			array('alpha_dash', array(':value', TRUE)), // The first array value is the method name, the second is an array of paramters.
+		'name' => array(
 			array('not_empty'),
 		),
 	);

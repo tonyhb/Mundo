@@ -2,6 +2,7 @@
 
 include __DIR__.'/test_data/blogpost.php';
 include __DIR__.'/test_data/page.php';
+include __DIR__.'/test_data/resource.php';
 
 /**
  * Tests the Mundo class

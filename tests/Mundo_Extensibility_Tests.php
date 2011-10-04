@@ -158,4 +158,78 @@ class Mundo_Extensibility_Tests extends PHPUnit_Framework_TestCase {
 
 		$this->assertTrue($model->loaded());
 	}
+
+	public function test_setting_selectively_extensible_fields()
+	{
+		$model = new Model_Resource;
+
+		try
+		{
+			$failed = FALSE;
+			$model->set(array(
+				"type" => "task",
+				"name" => "Rewrite presentation",
+				"foo" => "bar",
+			));
+		}
+		catch(Exception $e)
+		{
+			$failed = TRUE;
+			$this->assertEquals("Field 'foo' does not exist", $e->getMessage());
+		}
+
+		if ( ! $failed)
+		{
+			$this->fail('The model should only allow unmapped fields described in $_extensible');
+		}
+
+		$model->set(array(
+			"type" => "task",
+			"name" => "Rewrite presentation",
+			"metadata.author" => "Jane Smith",
+			"metadata.location" => "Example",
+		));
+
+		$this->assertEquals(array(
+			"type" => "task",
+			"name" => "Rewrite presentation",
+			"metadata" => array(
+				"author" => "Jane Smith",
+				"location" => "Example",
+			),
+		), $model->get());
+
+		$model->set("comments", array(
+			array(
+				"name" => "Laura",
+				"text" => "Comment 1",
+			),
+			array(
+				"name" => "Emma",
+				"text" => "Comment 2",
+				"upboats" => array("Wadsworth", "Sure_Ill_Draw_That")
+			)
+		));
+
+		$this->assertEquals(array(
+			"type" => "task",
+			"name" => "Rewrite presentation",
+			"metadata" => array(
+				"author" => "Jane Smith",
+				"location" => "Example",
+			),
+			"comments" => array(
+				array(
+					"name" => "Laura",
+					"text" => "Comment 1",
+				),
+				array(
+					"name" => "Emma",
+					"text" => "Comment 2",
+					"upboats" => array("Wadsworth", "Sure_Ill_Draw_That")
+				)
+			),
+		), $model->get());
+
+	}
 }
