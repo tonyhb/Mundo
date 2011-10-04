@@ -180,7 +180,7 @@ class Mundo_Extensibility_Tests extends PHPUnit_Framework_TestCase {
 
 		if ( ! $failed)
 		{
-			$this->fail('The model should only allow unmapped fields described in $_extensible');
+			$this->fail('The model should only allow unmapped fields described in $_schemaless');
 		}
 
 		$model->set(array(

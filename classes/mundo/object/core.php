@@ -50,7 +50,7 @@ class Mundo_Object_Core
 	 *
 	 * @var bool;
 	 */
-	protected $_extensible = FALSE;
+	protected $_schemaless = FALSE;
 
 	/**
 	 * This is a container for the object's saved data
@@ -406,15 +406,15 @@ class Mundo_Object_Core
 	 */
 	protected function _check_field_exists($field)
 	{
-		if ($this->_extensible === TRUE)
+		if ($this->_schemaless === TRUE)
 			return TRUE;
 
 		// Replace any positional modifier keys with '$'
 		$field = preg_replace('#\.[0-9]+#', '.$', $field);
 
-		if (is_array($this->_extensible))
+		if (is_array($this->_schemaless))
 		{
-			foreach($this->_extensible as $schemaless_field)
+			foreach($this->_schemaless as $schemaless_field)
 			{
 				if(substr($field, 0, strlen($schemaless_field)) == $schemaless_field)
 					return TRUE;

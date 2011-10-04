@@ -9,7 +9,7 @@
  * only an array of values (ie. array('one', 'two', ...)) they cannot accept
  * multi-dimensional arrays, or embedded objects.
  *
- * Setting the field in $_extensible bypasses this issue, making the main
+ * Setting the field in $_schemaless bypasses this issue, making the main
  * collection non-extensible whilst the embedded object can have any data
  * inside it whatsoever.
  *
@@ -37,7 +37,7 @@ class Model_Resource extends Mundo_Object
 	 * @var mixed Boolean for the status of the whole object, or an array 
 	 *            of extensible fields
 	 */
-	protected $_extensible = array(
+	protected $_schemaless = array(
 		'metadata', // Allow a single embedded collection with unmapped schema (ie metadata.author, metadata.date etc)
 		'comments.$', // Allow multiple embedded collections each with unmapped schema (ie comments.0.author, comments.1.author etc...)
 	);
