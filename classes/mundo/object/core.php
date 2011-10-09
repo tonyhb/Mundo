@@ -733,6 +733,9 @@ class Mundo_Object_Core
 			// Reset our changed array
 			$this->_changed = array();
 
+			// Reset our next update property
+			$this->_reset_update();
+
 			if (empty($fields))
 			{
 				// We loaded the full object from the database
