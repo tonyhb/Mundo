@@ -1,6 +1,10 @@
 Changelog
 ---------
 
+### Version 0.6.4
+
+* Fixed bug where setting values for loading changed atomic update queries
+
 ### Version 0.6.3 (4 October 2011)
 
 * Added support for schema-less embedded objects as opposed to the whole object
