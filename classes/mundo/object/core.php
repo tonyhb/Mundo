@@ -774,12 +774,7 @@ class Mundo_Object_Core
 		// function: this code is duplicated from the load() method
 		$query = array();
 
-		if ( ! $this->changed() AND ! $this->loaded())
-		{
-			// No data to query with
-			throw new Mundo_Exception("No model data supplied");
-		}
-		elseif ( ! $this->changed())
+		if ( ! $this->changed() AND $this->get() !== NULL)
 		{
 			// No changed data, so assume we are reloading our object. Use the current ObjectId.
 			$query = array('_id' => $this->get('_id'));
