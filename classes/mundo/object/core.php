@@ -110,7 +110,7 @@ class Mundo_Object_Core
 	 *
 	 * @param array $data 
 	 */
-	public function __construct($data = array())
+	public function __construct($data = array(), $seed_state = array())
 	{
 		if ( ! is_array($data))
 		{
@@ -119,7 +119,15 @@ class Mundo_Object_Core
 		}
 
 		// Set our data
-		$this->set($data);
+		if ( ! empty($seed_state))
+		{
+			$this->_clean_up($data);
+			$this->_partial = $seed_state['partial'];
+		}
+		else
+		{
+			$this->set($data);
+		}
 
 		// Set the _collection property to a MongoCollection
 		$this->_collection = Mundo::$db->{$this->_collection};
@@ -752,6 +760,45 @@ class Mundo_Object_Core
 	}
 
 	/**
+	 * Creates a query from the current data and returns a cursor with all 
+	 * results from the query.
+	 *
+	 * This is similar to {@link load()} but is not limited to one result
+	 * 
+	 * @param array  array of fields to return
+	 * @return Mundo_Cursor
+	 */
+	public function find($fields = array())
+	{
+		// @todo extract the following up to line 782 and make a separate 
+		// function: this code is duplicated from the load() method
+		$query = array();
+
+		if ( ! $this->changed() AND ! $this->loaded())
+		{
+			// No data to query with
+			throw new Mundo_Exception("No model data supplied");
+		}
+		elseif ( ! $this->changed())
+		{
+			// No changed data, so assume we are reloading our object. Use the current ObjectId.
+			$query = array('_id' => $this->get('_id'));
+		}
+		else
+		{
+			// Use all recent data as our query. You should use indexed keys here.
+			// Note that this is flattened so we can query into objects
+			$query = Mundo::flatten($this->get());
+		}
+
+		$config = Kohana::$config->load('Mundo');
+
+		$model_name = get_class($this);
+
+		return new Mundo_Cursor(Mundo::$mongo, $config->database.'.'.$this->_collection->getName(), $query, $fields, $model_name);
+	}
+
+	/**
 	 * Creates a new document in our collection
 	 *
 	 * @param   array  Array of options for the MongoCollection::insert method
@@ -971,6 +1018,7 @@ class Mundo_Object_Core
 
 		return $this->_collection->remove($query, $options);
 	}
+
 	/**
 	 * Helper function for database interction methods.
 	 *
