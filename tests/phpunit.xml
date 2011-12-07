@@ -15,11 +15,14 @@
 
 	<testsuites> 
 		<testsuite name="Mundo Tests"> 
+			<!--
 			<file>./Mundo_Tests.php</file>
 			<file>./Mundo_Object_Tests.php</file>
 			<file>./Mundo_Object_Update_Tests.php</file>
 			<file>./Mundo_Object_Delete_Tests.php</file>
 			<file>./Mundo_Extensibility_Tests.php</file>
+			-->
+			<file>./Mundo_Object_Find_Tests.php</file>
 		</testsuite> 
 	</testsuites> 
 
