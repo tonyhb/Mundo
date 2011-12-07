@@ -46,6 +46,9 @@ class Mundo_Cursor_Core extends MongoCursor
 	{
 		$data = parent::current();
 
+		if ( ! is_array($data))
+			return $data;
+
 		return new $this->_object($data, array('partial' => $this->_partial));
 	}
 }
