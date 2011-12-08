@@ -1,5 +1,11 @@
 <?php defined('SYSPATH') or die('No direct script access.');
 
+/**
+ * This class overrides the MongoCursor class to return Mundo objects instead of 
+ * associated arrays for each object in the query result
+ *
+ * @since 0.7
+ */
 class Mundo_Cursor_Core extends MongoCursor
 {
 	/**
