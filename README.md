@@ -230,13 +230,32 @@ You can see we checked the model was loaded using the `loaded()` method, which w
 
 *Subset of fields*
 
-You can choose to return a subset of fields from Mongo too. Just pass an array to the `load()` method with the field names you want to load (or ignore). It works exactly the same way as [MongoCollection::find in PHP](http://www.php.net/manual/en/mongocollection.find.php).
+You can choose to return a subset of fields from Mongo too. Just pass an array to the `load()` method with the field names you want to load (or ignore). It works exactly the same way as [MongoCollection::findOne in PHP](http://www.php.net/manual/en/mongocollection.findone.php).
 
 If you do choose to load just a few fields from the whole object, Mundo will set the model's state to partially loaded. This means you won't be able to run the `save()` method and overwrite your entire object with just the few fields you're working with. You can check if your model is partially loaded by running:
 
     $partial = $model->partial(); // TRUE if you've returned a subset of fields, FALSE if you have the whole object
 
 This resets if you run `load()` and get the whole object. Cool, huh?
+
+
+Finding several objects in a collection
+---------------------------------------
+
+Since 0.7 you can query a collection to return a cursor of results. The use is
+exactly the same as [MongoCollection::find in PHP](http://www.php.net/manual/en/mongocollection.find.php) which returns a Mundo_Cursor - an extension of [MongoCursor](http://www.php.net/manual/en/class.mongocursor.php) which, when returning data, returns a Mundo object instead of an array.
+
+For example:
+
+	$posts = Mundo::factory('posts')->find('author' => 'Mike Jones'); // Returns a Mundo_Cursor
+	
+	posts->sort(array('date' => 1, 'likes' => 1); // All MongoCursor methods work as expected
+	$count = $posts->count();
+	
+	foreach ($posts as $item) {
+		$item->get('title') // The object returned is a loaded Mundo object
+	}
+
 
 Deleting a document
 -------------------
@@ -251,8 +270,8 @@ Note that if you have no data in your model this can (and will) remove every obj
 Wrap-up
 -------
 
-That's the basics! Remember, it's not feature-complete. I want to add a find() method to query for many results, allow filtering of data when it's set (so we can automatically hyphenise slugs, for example) and allow extending objects beyond the `$_fields`.
+That's the basics! Remember, it's not feature-complete. I want to allow filtering of data when it's set (so we can automatically hyphenise slugs, for example), and welcome other ideas.
 
 If you've found a bug or have an idea for this please raise a new issue, I'd love to hear your feedback.
 
-You can use this library wherever and whenever you see fit: it's released under the MIT lisence.
+You can use this library wherever and whenever you see fit: it's released under the MIT license.

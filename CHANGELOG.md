@@ -1,6 +1,11 @@
 Changelog
 ---------
 
+### Version 0.7 (8 December 2011)
+
+* Adding find() method to load a cursor of results
+* Implementing a Mundo_Cursor class to return Mundo objects instead of arrays when looping through a mongo cursor
+
 ### Version 0.6.4
 
 * Fixed bug where setting values for loading changed atomic update queries
