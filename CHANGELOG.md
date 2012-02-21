@@ -1,6 +1,11 @@
 Changelog
 ---------
 
+### Version 0.7.1 (21 February 2012)
+
+* Allowing model names to use forward slashes, mapped to an underscore. For example, we can now do `Mundo::factory('account/user')` and load a user model in the `model/account/user` path.
+* Fixing a couple of typos in the README.md file examples.
+
 ### Version 0.7 (8 December 2011)
 
 * Adding find() method to load a cursor of results
