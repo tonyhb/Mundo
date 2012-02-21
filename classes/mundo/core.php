@@ -10,7 +10,7 @@
 class Mundo_Core
 {
 
-	const VERSION = '0.7';
+	const VERSION = '0.7.1';
 
 	const ASC = 1;
 	const DESC = -1;
@@ -59,6 +59,11 @@ class Mundo_Core
 		// String typecast
 		$model = (string) $model;
 
+		// Ensure we can specify model names such as 'account/user' meaning 
+		// a user model in the model/account path.
+		$model = str_replace('/', '_', $model);
+
+		// Add the Kohana model prefix
 		$model = 'Model_'.$model;
 
 		return new $model($data);
