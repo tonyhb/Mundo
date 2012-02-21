@@ -71,7 +71,6 @@ Here's an example, which we will run through after the code:
 				array('Mundo::instance_of', array(':value', 'MongoId')),
 				array('not_empty'),
 			),
-			),
 			'comments.$.author_name' => array(
 				array('not_empty'),
 			),
@@ -122,7 +121,7 @@ If you only want schema-less embedded collections, you can set the `$_schemaless
 
 	protected $_schemaless = array(
 		'metadata', // This allows a single embedded object (ie metadata.created_on, metadata.keywords etc.)
-		'comments.$ // This allows an array of embedded objects (ie comments.0.comment, comments.1.comment, comments.1.votes)
+		'comments.$' // This allows an array of embedded objects (ie comments.0.comment, comments.1.comment, comments.1.votes)
 	);
 
 
@@ -166,7 +165,7 @@ Setting embedded data is easy, too:
 
 Or:
 
-    $model->('post_metadata.keywords') = 'foo, bar, bas';
+    $model->{'post_metadata.keywords'} = 'foo, bar, bas';
 
 
 Creating a document
