@@ -57,4 +57,16 @@ class Mundo_Cursor_Core extends MongoCursor
 
 		return new $this->_object($data, array('partial' => $this->_partial));
 	}
+
+	/**
+	 * Returns the next document from the cursor. This is identical to 
+	 * getNext() except this returns a Mundo object.
+	 *
+	 * @return Mundo_Object
+	 */
+	public function getNext()
+	{
+		$this->next();
+		return $this->current();
+	}
 }
