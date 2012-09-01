@@ -1,6 +1,9 @@
 Changelog
 ---------
 
+### Version 0.7.2 (1 September 2012)
+* Adds a `getNext()` method to `Mundo_Cursor_Core` which returns Mundo object instances instead of arrays
+
 ### Version 0.7.1 (21 February 2012)
 
 * Allowing model names to use forward slashes, mapped to an underscore. For example, we can now do `Mundo::factory('account/user')` and load a user model in the `model/account/user` path.
