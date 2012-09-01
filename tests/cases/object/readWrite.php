@@ -380,14 +380,6 @@ class Mundo_Object_readWrite_Tests extends Mundo_Tests_Abstract {
 	}
 
 	/**
-	 * @Todo Test saving with no changed data does nothing
-	 */
-
-	/**
-	 * @todo Test update() fails with invalid data
-	 */
-
-	/**
 	 * Ensures that running the update method on an object that hasn't been
 	 * loaded from the database fails
 	 *
@@ -406,5 +398,13 @@ class Mundo_Object_readWrite_Tests extends Mundo_Tests_Abstract {
 
 		$document->update();
 	}
+
+	/**
+	 * @Todo Test saving with no changed data does nothing
+	 */
+
+	/**
+	 * @todo Test update() fails with invalid data
+	 */
 
 }
