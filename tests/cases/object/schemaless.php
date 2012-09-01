@@ -9,7 +9,7 @@
  * @category Tests
  * @author Tony Holdstock-Brown
  */
-class Mundo_Extensibility_Tests extends PHPUnit_Framework_TestCase {
+class Mundo_Object_Schemaless_Tests extends PHPUnit_Framework_TestCase {
 
 	/**
 	 * Remove any test databases.

@@ -1,8 +1,8 @@
 <?php
 
-include __DIR__.'/test_data/blogpost.php';
-include __DIR__.'/test_data/page.php';
-include __DIR__.'/test_data/resource.php';
+include dirname(dirname(__DIR__)).'/test_data/blogpost.php';
+include dirname(dirname(__DIR__)).'/test_data/page.php';
+include dirname(dirname(__DIR__)).'/test_data/resource.php';
 
 /**
  * Tests the Mundo class
@@ -11,7 +11,7 @@ include __DIR__.'/test_data/resource.php';
  * @category Tests
  * @author Tony Holdstock-Brown
  */
-class MundoTests extends PHPUnit_Framework_TestCase
+class Mundo_Tests extends PHPUnit_Framework_TestCase
 {
 
 	/**

@@ -770,21 +770,9 @@ class Mundo_Object_Core
 	 */
 	public function find($fields = array())
 	{
-		// @todo extract the following up to line 782 and make a separate 
-		// function: this code is duplicated from the load() method
-		$query = array();
-
-		if ( ! $this->changed() AND $this->get() !== NULL)
-		{
-			// No changed data, so assume we are reloading our object. Use the current ObjectId.
-			$query = array('_id' => $this->get('_id'));
-		}
-		else
-		{
-			// Use all recent data as our query. You should use indexed keys here.
-			// Note that this is flattened so we can query into objects
-			$query = Mundo::flatten($this->get());
-		}
+		// Use all recent data as our query. You should use indexed keys here.
+		// Note that this is flattened so we can query into objects
+		$query = Mundo::flatten($this->get());
 
 		$config = Kohana::$config->load('Mundo');
 

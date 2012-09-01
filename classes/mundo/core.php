@@ -10,7 +10,7 @@
 class Mundo_Core
 {
 
-	const VERSION = '0.7.1';
+	const VERSION = '0.7.2';
 
 	const ASC = 1;
 	const DESC = -1;

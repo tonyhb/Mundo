@@ -15,12 +15,19 @@
 
 	<testsuites> 
 		<testsuite name="Mundo Tests"> 
-			<file>./Mundo_Tests.php</file>
-			<file>./Mundo_Object_Tests.php</file>
-			<file>./Mundo_Object_Update_Tests.php</file>
-			<file>./Mundo_Object_Delete_Tests.php</file>
-			<file>./Mundo_Extensibility_Tests.php</file>
-			<file>./Mundo_Object_Find_Tests.php</file>
+			<file>./cases/mundo/mundo.php</file>
+			<file>./cases/object/getAndSet.php</file>
+			<file>./cases/object/unset.php</file>
+			<file>./cases/object/inc.php</file>
+			<file>./cases/object/push.php</file>
+			<file>./cases/object/pop.php</file>
+			<file>./cases/object/schemaless.php</file>
+			<file>./cases/object/atomicity.php</file>
+			<file>./cases/object/validate.php</file>
+			<file>./cases/object/readWrite.php</file>
+			<file>./cases/object/find.php</file>
+			<file>./cases/object/update.php</file>
+			<file>./cases/object/delete.php</file>
 		</testsuite> 
 	</testsuites> 
 
