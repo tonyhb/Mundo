@@ -16,7 +16,7 @@ class Mundo_Cursor_Core extends MongoCursor
 	protected $_partial = FALSE;
 
 	/**
-	 * The name of the mundo object class to return from {@link current()}
+	 * The name of the Mundo object class to return from {@link current()}
 	 *
 	 * @var string
 	 */

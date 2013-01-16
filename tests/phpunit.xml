@@ -15,7 +15,7 @@
 
 	<testsuites> 
 		<testsuite name="Mundo Tests"> 
-			<file>./cases/mundo/mundo.php</file>
+			<file>./cases/Mundo/Mundo.php</file>
 			<file>./cases/object/getAndSet.php</file>
 			<file>./cases/object/unset.php</file>
 			<file>./cases/object/inc.php</file>
@@ -35,7 +35,7 @@
 		<whitelist>
 			<directory suffix=".php">../classes/</directory>
 			<exclude>
-				<file>../classes/mundo.php</file>
+				<file>../classes/Mundo.php</file>
 			</exclude>
 		</whitelist>
 	</filter>

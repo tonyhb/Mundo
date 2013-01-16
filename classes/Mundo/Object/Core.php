@@ -10,7 +10,6 @@
  **/
 class Mundo_Object_Core
 {
-
 	/**
 	 * This is the name of the collection we're saving to in MongoDB.
 	 *
@@ -38,8 +37,6 @@ class Mundo_Object_Core
 
 	/**
 	 * An array of filters which are ran when setting data.
-	 *
-	 * !! This is unimplemented
 	 *
 	 * @var array
 	 */
@@ -617,7 +614,6 @@ class Mundo_Object_Core
 	 */
 	protected function _validate()
 	{
-
 		$validate = $this->validate();
 
 		if ( ! $validate->check())
@@ -628,6 +624,7 @@ class Mundo_Object_Core
 
 		return TRUE;
 	}
+
 	/**
 	 * This extracts rules form $_rules in the format required for the
 	 * Validation library
@@ -774,7 +771,7 @@ class Mundo_Object_Core
 		// Note that this is flattened so we can query into objects
 		$query = Mundo::flatten($this->get());
 
-		$config = Kohana::$config->load('Mundo');
+		$config = Kohana::$config->load('mundo');
 
 		$model_name = get_class($this);
 
@@ -796,6 +793,9 @@ class Mundo_Object_Core
 			throw new Mundo_Exception("Cannot create a new document because the model is already loaded");
 		}
 
+		// Filter our data
+		$this->_filter();
+
 		// Ensure our data is valid
 		$this->_validate();
 
@@ -803,7 +803,7 @@ class Mundo_Object_Core
 		$data = $this->_merge();
 
 		// Merge the default options with user provided ones, if necessary
-		$options = Arr::merge(Kohana::$config->load('Mundo')->query_options, $options);
+		$options = Arr::merge(Kohana::$config->load('mundo')->query_options, $options);
 
 		// Insert our data
 		$return = $this->_collection->insert($data, $options);
@@ -830,6 +830,9 @@ class Mundo_Object_Core
 			throw new Mundo_Exception("Cannot save the model because it is only partially loaded. Use the update method instead or fully load the object");
 		}
 
+		// Filter our data
+		$this->_filter();
+
 		// Validate our data
 		$this->_validate();
 
@@ -846,7 +849,7 @@ class Mundo_Object_Core
 		}
 
 		// Merge the default options with user provided ones, if necessary
-		$options = Arr::merge(Kohana::$config->load('Mundo')->query_options, $options);
+		$options = Arr::merge(Kohana::$config->load('mundo')->query_options, $options);
 
 		$this->_collection->save($data, $options);
 
@@ -877,6 +880,9 @@ class Mundo_Object_Core
 		if ( ! $this->changed())
 			return $this;
 
+		// Filter our data
+		$this->_filter();
+
 		// Validate our data
 		$this->_validate();
 
@@ -884,7 +890,7 @@ class Mundo_Object_Core
 		$update = $this->next_update();
 
 		// Merge the default options with user provided ones, if necessary
-		$options = Arr::merge(Kohana::$config->load('Mundo')->query_options, $options);
+		$options = Arr::merge(Kohana::$config->load('mundo')->query_options, $options);
 
 		// Update using our $id
 		$status = $this->_collection->update(array('_id' => $this->get('_id')), $update, $options);
@@ -997,7 +1003,7 @@ class Mundo_Object_Core
 		}
 
 		// Merge the default options with user provided ones, if necessary
-		$options = Arr::merge(Kohana::$config->load('Mundo')->query_options, $options);
+		$options = Arr::merge(Kohana::$config->load('mundo')->query_options, $options);
 
 		return $this->_collection->remove($query, $options);
 	}
@@ -1026,4 +1032,80 @@ class Mundo_Object_Core
 		$this->_loaded = TRUE;
 	}
 
+	/**
+	 * Filters the data and prepares data for validation
+	 *
+	 * @param   string $data 
+	 * @return  void
+	 */
+	public function _filter($data = NULL)
+	{
+		if ( ! $data)
+		{
+			// Use already set data if none is given
+			$data = $this->get();
+		}
+
+		$flat_data = Mundo::flatten($data);
+
+		if ($this->_filters)
+		{
+			// Get our rules
+			$filters = $this->_extract_rules($data, $this->_filters);
+			
+			foreach ($filters as $field => $array)
+			{
+				// Bind the field name and model so they can be used in the filter method
+				$_bound = array
+				(
+					':field' => $field,
+					':model' => $this,
+				);
+
+				foreach ($array as $filter_array) 
+				{
+					$_bound[':value'] = $this->get($_bound[':field']);
+
+					$filter = $filter_array[0];
+					$params = Arr::get($filter_array, 1, array(':value'));
+
+					foreach ($params as $key => $param)
+					{
+						if (is_string($param) AND array_key_exists($param, $_bound))
+						{
+							// Replace with bound value
+							$params[$key] = $_bound[$param];
+						}
+					}
+
+					if (is_array($filter) OR ! is_string($filter))
+					{
+						// This is either a callback as an array or a lambda
+						$value = call_user_func_array($filter, $params);
+					}
+					elseif (strpos($filter, '::') === FALSE)
+					{
+						// Use a function call
+						$function = new ReflectionFunction($filter);
+
+						// Call $function($this[$field], $param, ...) with Reflection
+						$value = $function->invokeArgs($params);
+					}
+					else
+					{
+						// Split the class and method of the rule
+						list($class, $method) = explode('::', $filter, 2);
+
+						// Use a static method call
+						$method = new ReflectionMethod($class, $method);
+
+						// Call $Class::$method($this[$field], $param, ...) with Reflection
+						$value = $method->invokeArgs(NULL, $params);
+					}
+
+					$this->set($_bound[':field'], $value);
+				}
+			}
+		}
+	}
 } // End Mundo_Object_Core

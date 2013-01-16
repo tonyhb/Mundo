@@ -10,7 +10,7 @@
 class Mundo_Core
 {
 
-	const VERSION = '0.7.2';
+	const VERSION = '0.7.3';
 
 	const ASC = 1;
 	const DESC = -1;
@@ -47,7 +47,7 @@ class Mundo_Core
 	{
 		if ( ! self::$mongo instanceof Mongo)
 		{
-			$config = Kohana::$config->load('Mundo');
+			$config = Kohana::$config->load('mundo');
 
 			// Connect to the database
 			self::$mongo = new Mongo($config->servers, $config->connect_options);
@@ -64,7 +64,7 @@ class Mundo_Core
 		$model = str_replace('/', '_', $model);
 
 		// Add the Kohana model prefix
-		$model = 'Model_'.$model;
+		$model = 'Model_'.ucfirst($model);
 
 		return new $model($data);
 	}
@@ -183,6 +183,20 @@ class Mundo_Core
 	public static function instance_of($object, $name)
 	{
 		return is_object($object) && ($object instanceof $name);
+	}
+
+	/**
+	 * Returns MongoDate object
+	 * 
+	 * @param mixed $date
+	 * @return MongoDate object
+	 */
+	public static function date($date)
+	{
+		if($date instanceof MongoDate)
+			return $date;
+		else
+			return new MongoDate($date);
 	}
 
 } // End Mundo_Core

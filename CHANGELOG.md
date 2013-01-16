@@ -1,5 +1,8 @@
 Changelog
 ---------
+### Version 0.7.3 (15 January 2013)
+* PSR-0 standard for autoloading classes / kohana 3.3
+* Implemented $_filters for Mundo_Object
 
 ### Version 0.7.2 (1 September 2012)
 * Adds a `getNext()` method to `Mundo_Cursor_Core` which returns Mundo object instances instead of arrays
