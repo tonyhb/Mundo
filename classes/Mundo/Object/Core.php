@@ -771,7 +771,7 @@ class Mundo_Object_Core
 		// Note that this is flattened so we can query into objects
 		$query = Mundo::flatten($this->get());
 
-		$config = Kohana::$config->load('Mundo');
+		$config = Kohana::$config->load('mundo');
 
 		$model_name = get_class($this);
 
@@ -803,7 +803,7 @@ class Mundo_Object_Core
 		$data = $this->_merge();
 
 		// Merge the default options with user provided ones, if necessary
-		$options = Arr::merge(Kohana::$config->load('Mundo')->query_options, $options);
+		$options = Arr::merge(Kohana::$config->load('mundo')->query_options, $options);
 
 		// Insert our data
 		$return = $this->_collection->insert($data, $options);
@@ -849,7 +849,7 @@ class Mundo_Object_Core
 		}
 
 		// Merge the default options with user provided ones, if necessary
-		$options = Arr::merge(Kohana::$config->load('Mundo')->query_options, $options);
+		$options = Arr::merge(Kohana::$config->load('mundo')->query_options, $options);
 
 		$this->_collection->save($data, $options);
 
@@ -890,7 +890,7 @@ class Mundo_Object_Core
 		$update = $this->next_update();
 
 		// Merge the default options with user provided ones, if necessary
-		$options = Arr::merge(Kohana::$config->load('Mundo')->query_options, $options);
+		$options = Arr::merge(Kohana::$config->load('mundo')->query_options, $options);
 
 		// Update using our $id
 		$status = $this->_collection->update(array('_id' => $this->get('_id')), $update, $options);
@@ -1003,7 +1003,7 @@ class Mundo_Object_Core
 		}
 
 		// Merge the default options with user provided ones, if necessary
-		$options = Arr::merge(Kohana::$config->load('Mundo')->query_options, $options);
+		$options = Arr::merge(Kohana::$config->load('mundo')->query_options, $options);
 
 		return $this->_collection->remove($query, $options);
 	}
