@@ -174,6 +174,12 @@ class Mundo_Object_Core
 
 		foreach ($values as $field => $value)
 		{
+			// It's important that we don't use the mapped field to update the 
+			// $changed property otherwise we won't have the right 
+			// human-readable field names using the get method. Field names must 
+			// be mapped to the database when saving.
+			$mapped_field = $this->_map_field($field);
+
 			if ($value === NULL)
 			{
 				// Call the unset method
@@ -182,30 +188,31 @@ class Mundo_Object_Core
 			}
 
 			// Check the field exists
-			if ( ! $this->_check_field_exists($field))
+			if ( ! $this->_check_field_exists($mapped_field))
 			{
 				throw new Mundo_Exception("Field ':field' does not exist", array(':field' => $field));
 			}
 
-			// Set our data
+			// Set our data. This needs to use the model-friendly field ($field)
 			Arr::set_path($this->_changed, $field, $value);
 
-			// Make sure the $unset operation isn't set
-			if (isset($this->_next_update['$unset'][$field]))
+			// Make sure the $unset operation isn't set. This uses the DB field.
+			if (isset($this->_next_update['$unset'][$mapped_field]))
 			{
-				unset($this->_next_update['$unset'][$field]);
+				unset($this->_next_update['$unset'][$mapped_field]);
 			}
 
 			if (is_numeric($value) AND (is_numeric($this->original($field)) OR $this->original($field) === NULL))
 			{
 				// Work out difference for incrementing
 				$difference = $value - $this->original($field);
-				$this->_next_update['$inc'] = array_merge($this->_next_update['$inc'], array($field => $difference));
+				$this->_next_update['$inc'] = array_merge($this->_next_update['$inc'], array($mapped_field => $difference));
 				continue;
 			}
 
-			// This must be a $set
-			$this->_next_update['$set'] = array_merge($this->_next_update['$set'], array($field => $value));
+			// This must be a $set. Use the mapped DB field to ensure the next 
+			// atomic update will affect the proper field.
+			$this->_next_update['$set'] = array_merge($this->_next_update['$set'], array($mapped_field => $value));
 
 		}
 
@@ -286,7 +293,7 @@ class Mundo_Object_Core
 	/**
 	 * Unsets $field data.
 	 *
-	 * This function sets the field data in $_changed to NULL and adds the
+	 * This method sets the field data in $_changed to NULL and adds the
 	 * $unset atomic operation.
 	 * 
 	 * It does NOT remove the field from $_changed, otherwise the save
@@ -396,7 +403,7 @@ class Mundo_Object_Core
 	}
 
 	/**
-	 * Convenience function for merging saved and changed data
+	 * Convenience method for merging saved and changed data
 	 *
 	 * @return array
 	 */
@@ -406,7 +413,84 @@ class Mundo_Object_Core
 	}
 
 	/**
-	 * Helper function which takes a field name and checks if it has been
+	 * Maps a human readable field name to the field name used in a MongoDB 
+	 * database.
+	 *
+	 * For space, speed and memory reasons it may be beneficial to map model 
+	 * field names in PHP to collection field names in MongoDB. This method 
+	 * handles the conversion between model fields and database fields.
+	 *
+	 * This method must be run to check if a field exists and prior to saving.
+	 *
+	 * @param string  field name to check, flattened.
+	 * @return mixed  FALSE if the field can't be mapped or the DB field name 
+	 *                as a string
+	 */
+	protected function _map_field($field)
+	{
+		// Return the field name because the fields array has no array keys and 
+		// therefore has no field maps/aliases
+		if ( ! Arr::is_assoc($this->_fields))
+			return $field;
+
+		// We know there's a mapped field now, so we'll do a basic 
+		// array_key_exists check first.
+		if (array_key_exists($field, $this->_fields))
+			return $this->_fields[$field];
+
+		// The only options at this point are embedded documents (ie, the 
+		// field's name is 'comments.$.text' allowing for many comments), the 
+		// field is the parent of embedde collections or field doesn't exist.
+		//
+		// That said, we've got to look for a full stop/period in the field 
+		// name, replace all numbers/array keys with a dollar sign for checking 
+		// and replace the standard field names with the mapped field names. IE:
+		// 'comments.1.text'  becomes 'c.$.t' for the mapping.
+		//
+		// The hardest part is remembering the numerical array keys we replace.
+		// We get those here:
+		preg_match_all('#\.[0-9]+#', $field, $positional_keys);
+		$positional_keys = $positional_keys[0];
+
+		// Replace any positional modifier keys with '$'
+		$positional_field = preg_replace('#\.[0-9]+#', '.$', $field);
+		$start_regex_check = '#^'.str_replace(array('$', '.'), array('\$', '\.'), $positional_field).'#';
+
+		if ($result = preg_grep($start_regex_check, array_keys($this->_fields)))
+		{
+			$result = array_shift($result);
+
+			// The field exists. Split the DB document field by the positional 
+			// dollar sign so we can insert the right array keys in. You may be 
+			// setting the third comment ('comments.3.text').
+			$split = preg_split('#\.\$#', $this->_fields[$result]);
+
+			// Because this may be the parent of embedded collections we also 
+			// need to know how far we go with the document field name.
+			$max_depth = count(explode('.', $field));
+
+			$document_field = '';
+			foreach ($split as $key => $field_part)
+			{
+				if ($key >= $max_depth)
+					break;
+
+				$document_field .= $field_part;
+				if (isset($positional_keys[$key]))
+				{
+					// If we need to add in the array key do so
+					$document_field .= $positional_keys[$key];
+				}
+			}
+
+			return $document_field;
+		}
+
+		return FALSE;
+	}
+
+	/**
+	 * Helper method which takes a field name and checks if it has been
 	 * defined in the model
 	 *
 	 * @param $field  string  field name
@@ -414,7 +498,7 @@ class Mundo_Object_Core
 	 */
 	protected function _check_field_exists($field)
 	{
-		if ($this->_schemaless === TRUE)
+		if ($this->_schemaless === TRUE && $field !== FALSE)
 			return TRUE;
 
 		// Replace any positional modifier keys with '$'
@@ -495,7 +579,10 @@ class Mundo_Object_Core
 		// Shift the field name from the data to append
 		$field = array_shift($args);
 
-		if ( ! $this->_check_field_exists($field))
+		// Get the DB field name
+		$mapped_field = $this->_map_field($field);
+
+		if ( ! $this->_check_field_exists($mapped_field))
 		{
 			// Fail because there's nothing to modify
 			throw new Mundo_Exception("Field ':field' does not exist", array(':field' => $field));
@@ -504,21 +591,39 @@ class Mundo_Object_Core
 		// Find out how many embedded collections are in $field (this will give us the next array key too)
 		$count = count($this->get($field));
 
-		// Loop through each piece of data to push onto the $field
-		foreach($args as $data)
+		foreach ($args as $array)
 		{
-			$this->_changed[$field][$count] = $data;
+			$this->_changed[$field][$count] = $array;
 			$count++;
 		}
 
-		if (isset($this->_next_update['$pushAll'][$field]))
+		// Loop through each piece of data and map the fields
+		$args = Mundo::flatten($args);
+		$data = array();
+		foreach($args as $key => $value)
+		{
+			$key = $field.'.'.$key;
+			$mapped_key = $this->_map_field($key);
+
+			// How deep is the array we're pushing onto?
+			$depth = count(explode('.', $field));
+
+			$mapped_key = explode('.', $mapped_key);
+			$mapped_key = implode('.', array_slice($mapped_key, $depth));
+
+			$data[$mapped_key] = $value;
+		}
+
+		$data = Mundo::inflate($data);
+
+		if (isset($this->_next_update['$pushAll'][$mapped_field]))
 		{
 			// Add the data to the $pushAll
-			$this->_next_update['$pushAll'][$field] = array_merge($this->_next_update['$pushAll'][$field], $args);
+			$this->_next_update['$pushAll'][$field] = array_merge($this->_next_update['$pushAll'][$mapped_field], $data);
 		}
 		else
 		{
-			$this->_next_update['$pushAll'][$field] = $args;
+			$this->_next_update['$pushAll'][$mapped_field] = $data;
 		}
 
 		return $count;
@@ -532,6 +637,9 @@ class Mundo_Object_Core
 	 */
 	public function pop($field)
 	{
+		// Get the DB field name
+		$mapped_field = $this->_map_field($field);
+
 		// Get the most recent model data
 		$data = $this->get($field);
 
@@ -545,22 +653,22 @@ class Mundo_Object_Core
 		$count = count($data) - 1;
 
 		// Is this a variable that has been pushed and hasn't been written to the database?
-		if (isset($this->_changed[$field][$count]) AND isset($this->_next_update['$pushAll'][$field]))
+		if (isset($this->_changed[$field][$count]) AND isset($this->_next_update['$pushAll'][$mapped_field]))
 		{
 			// If so, stop it from being added in $pushAll
-			array_pop($this->_next_update['$pushAll'][$field]);
+			array_pop($this->_next_update['$pushAll'][$mapped_field]);
 
 			// If that was the only atomic update for the $field...
-			if (empty($this->_next_update['$pushAll'][$field]))
+			if (empty($this->_next_update['$pushAll'][$mapped_field]))
 			{
 				// Remove the $field completely
-				unset($this->_next_update['$pushAll'][$field]);
+				unset($this->_next_update['$pushAll'][$mapped_field]);
 			}
 		}
 		else
 		{
 			// Add this to $_next_update
-			$this->_next_update['$pop'] += array($field => 1);
+			$this->_next_update['$pop'] += array($mapped_field => 1);
 		}
 
 		// Set the last element of the array to null so it overwrites data in get()
@@ -574,7 +682,7 @@ class Mundo_Object_Core
 	 * Loads a Validation object with the rules defined in the model and 
 	 * either the set model data or the data passed as an argument.
 	 *
-	 * Note: This function returns a Validation object and does not validate
+	 * Note: This method returns a Validation object and does not validate
 	 * data itself. Just run check() on this function's return value. This is
 	 * because it makes it easier to grab error messages and use the normal
 	 * Validation library.
@@ -610,7 +718,7 @@ class Mundo_Object_Core
 	}
 
 	/**
-	 * Helper function used to validate current data when querying database
+	 * Helper method used to validate current data when querying database
 	 *
 	 * @throws Validation_Exception
 	 * @return boolean
@@ -665,7 +773,7 @@ class Mundo_Object_Core
 			// to field => $rule in the next function call in the for-each loop
 			$rules = array($field[1] => $rules);
 
-			// We need to loop through each collection and re-call the function to add the rules to it.
+			// We need to loop through each collection and re-call the method to add the rules to it.
 			while($collection_count >= 0)
 			{
 				// Add the path to where we are, the field that contains the collections and the collection count together
@@ -842,6 +950,8 @@ class Mundo_Object_Core
 		// For each piece of changed data merge it in.
 		foreach($changed as $field => $value)
 		{
+			// Ensure we're using the right DB field names
+			$field = $this->_map_field($field);
 			Arr::set_path($data, $field, $value);
 		}
 
@@ -1003,7 +1113,7 @@ class Mundo_Object_Core
 	}
 
 	/**
-	 * Helper function for database interction methods.
+	 * Helper method for database interction methods.
 	 *
 	 * This is the model cleanup process after successful communication
 	 * with MongoDB

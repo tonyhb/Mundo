@@ -28,14 +28,17 @@
 			<file>./cases/object/find.php</file>
 			<file>./cases/object/update.php</file>
 			<file>./cases/object/delete.php</file>
+			<file>./cases/object/fieldMapping.php</file>
 		</testsuite> 
 	</testsuites> 
 
 	<filter>
 		<whitelist>
-			<directory suffix=".php">../classes/</directory>
+			<directory suffix=".php">../</directory>
 			<exclude>
 				<file>../classes/mundo.php</file>
+				<directory>../config</directory>
+				<directory>../tests</directory>
 			</exclude>
 		</whitelist>
 	</filter>

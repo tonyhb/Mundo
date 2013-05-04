@@ -3,6 +3,7 @@
 include dirname(dirname(__DIR__)).'/test_data/blogpost.php';
 include dirname(dirname(__DIR__)).'/test_data/page.php';
 include dirname(dirname(__DIR__)).'/test_data/resource.php';
+include dirname(dirname(__DIR__)).'/test_data/mapping.php';
 
 /**
  * Tests the Mundo class
